@@ -1,0 +1,35 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::245976212095:role/github-actions/geoffmore/actions-k8s-ci/ecr-push
+          aws-region: us-east-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
+            public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:${{ github.sha }}
+            public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:r${{ github.run_number }}
