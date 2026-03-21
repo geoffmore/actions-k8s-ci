@@ -4,12 +4,14 @@
 # Usage: ./tools/argo-diff-manifests <base.yaml> <pr.yaml>
 set -euo pipefail
 
+# Needed to source relative to local file path instead of caller path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/argocd.sh"
+
+check_deps # TODO - move within main fn to align with other tools
+
 BASE_FILE="${1:?Usage: argo-diff-manifests <base.yaml> <pr.yaml>}"
 PR_FILE="${2:?Usage: argo-diff-manifests <base.yaml> <pr.yaml>}"
-
-for cmd in yq diff comm sort awk; do
-  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing required tool: $cmd" >&2; exit 1; }
-done
 
 BASE_DIR="$(mktemp -d)"
 PR_DIR="$(mktemp -d)"
@@ -17,12 +19,11 @@ BASE_KEYS_FILE="$(mktemp)"
 PR_KEYS_FILE="$(mktemp)"
 trap 'rm -rf "$BASE_DIR" "$PR_DIR" "$BASE_KEYS_FILE" "$PR_KEYS_FILE"' EXIT
 
-SPLIT_EXPR='(.apiVersion | sub("/","_")) + "__" + .kind + "__" + (.metadata.namespace // "_") + "__" + .metadata.name'
-
 split_manifest() {
+  local split_expr='(.apiVersion | sub("/","_")) + "__" + .kind + "__" + (.metadata.namespace // "_") + "__" + .metadata.name'
   local input_file="$1" out_dir="$2"
   if [ -s "$input_file" ]; then
-    (cd "$out_dir" && yq -s "$SPLIT_EXPR" "$input_file")
+    (cd "$out_dir" && yq -s "${split_expr}" "${input_file}")
   fi
 }
 
