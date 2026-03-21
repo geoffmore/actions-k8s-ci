@@ -3,11 +3,11 @@
 
 function check_deps() {
   local missing=()
-  for cmd in diff common sort awk helm kustomize yq kube-linter; do
+  for cmd in diff comm sort awk helm kustomize yq kube-linter; do
     command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
   done
   if [ ${#missing[@]} -gt 0 ]; then
     echo "ERROR: missing required tools: ${missing[*]}" >&2
-    exit 1
+    return 1
   fi
 }
