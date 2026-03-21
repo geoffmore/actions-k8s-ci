@@ -19,14 +19,6 @@ BASE_KEYS_FILE="$(mktemp)"
 PR_KEYS_FILE="$(mktemp)"
 trap 'rm -rf "$BASE_DIR" "$PR_DIR" "$BASE_KEYS_FILE" "$PR_KEYS_FILE"' EXIT
 
-split_manifest() {
-  local split_expr='(.apiVersion | sub("/","_")) + "__" + .kind + "__" + (.metadata.namespace // "_") + "__" + .metadata.name'
-  local input_file="$1" out_dir="$2"
-  if [ -s "$input_file" ]; then
-    (cd "$out_dir" && yq -s "${split_expr}" "${input_file}")
-  fi
-}
-
 split_manifest "$BASE_FILE" "$BASE_DIR"
 split_manifest "$PR_FILE"   "$PR_DIR"
 
