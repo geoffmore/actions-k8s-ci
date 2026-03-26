@@ -12,11 +12,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
 
       - name: Run ArgoCD tool tests
-        run: tools/testdata/applications/run-tests.sh
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest \
+            tools/testdata/applications/run-tests.sh
