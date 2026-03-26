@@ -75,47 +75,8 @@ render_kustomize() {
     exit 0
   fi
 }
-handle_single_source() {
-  local repo_url chart version release_name has_helm has_kustomize path
-  repo_url=$(yq '.spec.source.repoURL // ""' "$APP_FILE")
-  chart=$(yq '.spec.source.chart // .spec.source.path // ""' "$APP_FILE")
-  version=$(yq '.spec.source.targetRevision // "latest"' "$APP_FILE")
-  release_name=$(yq '.spec.source.helm.releaseName // "release"' "$APP_FILE")
-  has_helm=$(yq '.spec.source | has("helm") or has("chart")' "$APP_FILE")
-  has_kustomize=$(yq '.spec.source | has("kustomize")' "$APP_FILE")
-  path=$(yq '.spec.source.path // ""' "$APP_FILE")
 
-  local raw_value_files=()
-  mapfile -t raw_value_files < <(yq '.spec.source.helm.valueFiles[]?' "$APP_FILE")
 
-  if [ "$has_helm" = "true" ]; then
-    render_helm "$repo_url" "$chart" "$version" "$release_name" "${raw_value_files[@]+"${raw_value_files[@]}"}"
-  elif [ "$has_kustomize" = "true" ] || [ -n "$path" ]; then
-    render_kustomize "$repo_url" "$path"
-  else
-    echo "SKIP: Could not determine source type for $APP_FILE." >&2
-    exit 0
-  fi
-}
-
-handle_multi_source() {
-  local repo_url chart version release_name
-  repo_url=$(yq '.spec.sources[] | select(has("chart")) | .repoURL' "$APP_FILE")
-  chart=$(yq '.spec.sources[] | select(has("chart")) | .chart // .path // ""' "$APP_FILE")
-  version=$(yq '.spec.sources[] | select(has("chart")) | .targetRevision // "latest"' "$APP_FILE")
-  release_name=$(yq '.spec.sources[] | select(has("chart")) | .helm.releaseName // "release"' "$APP_FILE")
-
-  if [ -z "$chart" ]; then
-    echo "SKIP: No chart source found in multi-source Application $APP_FILE." >&2
-    exit 0
-  fi
-
-  # Collect value files from all sources
-  local raw_value_files=()
-  mapfile -t raw_value_files < <(yq '.spec.sources[].helm.valueFiles[]?' "$APP_FILE")
-
-  render_helm "$repo_url" "$chart" "$version" "$release_name" "${raw_value_files[@]+"${raw_value_files[@]}"}"
-}
 
 main() {
   check_deps
@@ -124,9 +85,9 @@ main() {
   is_multi=$(yq '.spec | has("sources")' "$APP_FILE")
 
   if [ "$is_multi" = "true" ]; then
-    handle_multi_source | lint
+    handle_multi_source "${APP_FILE}" | lint
   else
-    handle_single_source | lint
+    handle_single_source "${APP_FILE}" | lint
   fi
 }
 
