@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kustomize-local
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/geoffmore/actions-k8s-ci
+    path: tools/testdata/applications/kustomize-local/manifests
+    targetRevision: HEAD
+    kustomize: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default

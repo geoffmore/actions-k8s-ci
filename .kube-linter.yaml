@@ -1,0 +1,63 @@
+checks:
+  addAllBuiltIn: true
+  exclude:
+    # Globally not applicable
+    - "minimum-three-replicas"
+    - "required-annotation-email"
+    - "required-label-owner"
+    - "dnsconfig-options"
+    - "non-isolated-pod"
+
+ignoredObjectConfigurations:
+  # Suppress workload checks on CRD-backed resources that aren't actual workloads
+  - objectMatcher:
+      kinds:
+        - apiGroups: ["argoproj.io"]
+          kinds: ["Application", "AppProject", "ApplicationSet"]
+    checks:
+      - "no-resources-limits"
+      - "no-liveness-probe"
+      - "no-readiness-probe"
+      - "no-read-only-root-fs"
+      - "run-as-non-root"
+      - "non-default-service-account"
+      - "minimum-two-replicas"
+  - objectMatcher:
+      kinds:
+        - apiGroups: ["helm.toolkit.fluxcd.io", "kustomize.toolkit.fluxcd.io", "source.toolkit.fluxcd.io"]
+          kinds: ["*"]
+    checks:
+      - "no-resources-limits"
+      - "no-liveness-probe"
+      - "no-readiness-probe"
+      - "no-read-only-root-fs"
+      - "run-as-non-root"
+      - "non-default-service-account"
+      - "minimum-two-replicas"
+
+customChecks:
+  # - name: required-annotation-sumologic-source-category
+  #   description: Require sumologic.com/sourceCategory annotation on Deployments for log categorization
+  #   template: required-annotation
+  #   params:
+  #     key: "sumologic.com/sourceCategory"
+  #   remediation: Add a sumologic.com/sourceCategory annotation to your Deployment.
+  #   scope:
+  #     objectKinds:
+  #       - DeploymentLike
+
+  - name: minimum-two-replicas
+    description: Require at least 2 replicas for fault tolerance
+    template: minimum-replicas
+    params:
+      minReplicas: 2
+    remediation: Set replicas to at least 2, or document why a single replica is acceptable.
+    scope:
+      objectKinds:
+        - DeploymentLike
+
+ignoredFilePaths:
+  - "crds/**"
+  - "charts/**/crds/**"
+  - "**/values.yaml"
+  - "**/values-*.yaml"

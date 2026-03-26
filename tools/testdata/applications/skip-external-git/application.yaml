@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: skip-external-git
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/some-other-org/some-repo.git
+    path: deploy/
+    targetRevision: main
+    kustomize: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
