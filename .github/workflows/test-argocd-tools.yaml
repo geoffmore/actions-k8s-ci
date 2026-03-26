@@ -1,0 +1,22 @@
+name: test-argocd-tools
+
+on:
+  pull_request:
+    paths:
+      - tools/lib/common.sh
+      - tools/lib/argocd.sh
+      - tools/argocd-*.sh
+      - tools/testdata/applications/**
+      - .kube-linter.yaml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ArgoCD tool tests
+        run: tools/testdata/applications/run-tests.sh
