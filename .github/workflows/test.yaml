@@ -1,0 +1,40 @@
+name: test
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - tools/**
+      - testdata/**
+      - .kube-linter.yaml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: actions-k8s-ci:pr
+
+      - name: Run image smoke tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/image/test.sh
+
+      - name: Run ArgoCD tool tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/argocd/test.sh
