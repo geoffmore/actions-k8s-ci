@@ -40,6 +40,20 @@ check_cmd "argocd-render-application" argocd-render-application
 check_cmd "argocd-diff-manifests"     argocd-diff-manifests
 
 echo ""
+echo "--- runtime user ---"
+check() {
+  local label="$1" expected="$2" actual="$3"
+  if [ "$actual" = "$expected" ]; then
+    echo "PASS: $label"
+    pass=$((pass + 1))
+  else
+    echo "FAIL: $label (expected '$expected', got '$actual')"
+    fail=$((fail + 1))
+  fi
+}
+check "not running as root" "ci" "$(whoami)"
+
+echo ""
 echo "--- bundled config ---"
 check_file "bundled .kube-linter.yaml" /usr/local/lib/actions-k8s-ci/.kube-linter.yaml
 
