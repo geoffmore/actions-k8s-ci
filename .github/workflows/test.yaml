@@ -1,3 +1,19 @@
+# Testing strategy
+#
+# Image layer:  testdata/image/test.sh    — smoke tests binaries, symlinks, bundled config
+# Script layer: testdata/argocd/test.sh   — render, lint, and diff against local fixtures
+#
+# Action layer: NOT tested here.
+#   Composite actions (.github/actions/argocd-lint, argocd-diff) depend on GHA
+#   infrastructure (tj-actions/changed-files, git history for base ref) that
+#   cannot be meaningfully exercised outside a real pull request context.
+#   - argocd-lint: could be tested with a dedicated test workflow + fixtures
+#     under testdata/actions/ triggered on PRs touching .github/actions/**
+#   - argocd-diff: best tested end-to-end in a consumer repo (e.g. kubernetes),
+#     since it requires actual git history between base and PR branches
+#   Local alternative: use `act` (https://github.com/nektos/act) to run
+#   workflows locally, though some GHA behaviours differ.
+
 name: test
 
 on:
