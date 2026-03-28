@@ -8,36 +8,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/argocd.sh"
 
-APP_FILE="$1"
-APP_DIR="$(cd "$(dirname "$APP_FILE")" && pwd)"
-REPO_ROOT="$(git -C "$APP_DIR" rev-parse --show-toplevel)"
-CURRENT_REPO_URL="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || echo "")"
+setup_app_context "$1"
 
 lint() {
   kube-linter lint --config "$REPO_ROOT/.kube-linter.yaml" -
   # TODO - allow reading a custom kube-linter file. Maybe via default/$1?
 }
-
-
-
-render_kustomize() {
-  local repo_url="$1" path="$2"
-
-  if [[ "$repo_url" == *"$CURRENT_REPO_URL"* ]] || [[ "$repo_url" == *.git ]]; then
-    if [ -f "$REPO_ROOT/$path/kustomization.yaml" ] || [ -f "$REPO_ROOT/$path/kustomization.yml" ]; then
-      kustomize build "$REPO_ROOT/$path"
-    else
-      # Plain directory — lint directly, not via stdin
-      kube-linter lint --config "$REPO_ROOT/.kube-linter.yaml" "$REPO_ROOT/$path"
-      exit $?
-    fi
-  else
-    echo "SKIP: Kustomize/plain source from external repo ($repo_url) is not supported." >&2
-    exit 0
-  fi
-}
-
-
 
 main() {
   check_deps
