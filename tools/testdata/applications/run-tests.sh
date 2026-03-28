@@ -49,11 +49,11 @@ run_test "skip-unknown-source"  skip   tools/argocd-render-application.sh tools/
 run_test "skip-multi-no-chart"  skip   tools/argocd-render-application.sh tools/testdata/applications/skip-multi-no-chart/application.yaml
 
 echo ""
-echo "--- argocd-lint-application ---"
-run_test "kustomize-local"      output tools/argocd-lint-application.sh tools/testdata/applications/kustomize-local/application.yaml
-run_test "plain-dir-local"      output tools/argocd-lint-application.sh tools/testdata/applications/plain-dir-local/application.yaml
-run_test "skip-unknown-source"  skip   tools/argocd-lint-application.sh tools/testdata/applications/skip-unknown-source/application.yaml
-run_test "skip-multi-no-chart"  skip   tools/argocd-lint-application.sh tools/testdata/applications/skip-multi-no-chart/application.yaml
+echo "--- argocd-render-application --lint ---"
+run_test "kustomize-local"      output tools/argocd-render-application.sh --lint tools/testdata/applications/kustomize-local/application.yaml
+run_test "plain-dir-local"      output tools/argocd-render-application.sh --lint tools/testdata/applications/plain-dir-local/application.yaml
+run_test "skip-unknown-source"  skip   tools/argocd-render-application.sh --lint tools/testdata/applications/skip-unknown-source/application.yaml
+run_test "skip-multi-no-chart"  skip   tools/argocd-render-application.sh --lint tools/testdata/applications/skip-multi-no-chart/application.yaml
 
 echo ""
 echo "Results: $pass passed, $fail failed"
