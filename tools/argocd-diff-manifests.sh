@@ -23,8 +23,8 @@ trap 'rm -rf "$BASE_DIR" "$PR_DIR" "$BASE_KEYS_FILE" "$PR_KEYS_FILE"' EXIT
 split_manifest "$BASE_FILE" "$BASE_DIR"
 split_manifest "$PR_FILE"   "$PR_DIR"
 
-find "$BASE_DIR" -maxdepth 1 -name "*.yml" -printf '%f\n' | sort > "$BASE_KEYS_FILE" || true
-find "$PR_DIR"   -maxdepth 1 -name "*.yml" -printf '%f\n' | sort > "$PR_KEYS_FILE"   || true
+find "$BASE_DIR" -maxdepth 1 -name "*.yml" | awk -F/ '{print $NF}' | sort > "$BASE_KEYS_FILE" || true
+find "$PR_DIR"   -maxdepth 1 -name "*.yml" | awk -F/ '{print $NF}' | sort > "$PR_KEYS_FILE"   || true
 
 if [ ! -s "$BASE_KEYS_FILE" ] && [ ! -s "$PR_KEYS_FILE" ]; then
   echo "_No rendered output for either version (SKIP or unsupported source type)._"

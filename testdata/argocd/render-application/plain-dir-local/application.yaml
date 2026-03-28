@@ -6,7 +6,7 @@ metadata:
 spec:
   source:
     repoURL: https://github.com/geoffmore/actions-k8s-ci
-    path: tools/testdata/applications/plain-dir-local/manifests
+    path: testdata/argocd/render-application/plain-dir-local/manifests
     targetRevision: HEAD
   destination:
     server: https://kubernetes.default.svc

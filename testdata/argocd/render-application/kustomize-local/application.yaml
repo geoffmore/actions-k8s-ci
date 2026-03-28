@@ -6,7 +6,7 @@ metadata:
 spec:
   source:
     repoURL: https://github.com/geoffmore/actions-k8s-ci
-    path: tools/testdata/applications/kustomize-local/manifests
+    path: testdata/argocd/render-application/kustomize-local/manifests
     targetRevision: HEAD
     kustomize: {}
   destination:
