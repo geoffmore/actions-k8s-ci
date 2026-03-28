@@ -31,12 +31,12 @@ jobs:
             actions-k8s-ci:candidate \
             testdata/image/test.sh
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: arn:aws:iam::245976212095:role/github-actions/geoffmore/actions-k8s-ci/ecr-push
           aws-region: us-east-1
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2.1.1
         with:
           registry-type: public
 
