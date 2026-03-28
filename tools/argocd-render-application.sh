@@ -6,6 +6,7 @@ set -euo pipefail
 
 # Needed to source relative to local file path instead of caller path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/argocd.sh"
 
 DO_LINT=false
@@ -40,6 +41,8 @@ main() {
 
   if "$DO_LINT"; then
     : "${KUBE_LINTER_CONFIG:=$REPO_ROOT/.kube-linter.yaml}"
+    # Fall back to bundled default if repo doesn't have its own config
+    [ -f "$KUBE_LINTER_CONFIG" ] || KUBE_LINTER_CONFIG="${SCRIPT_DIR}/.kube-linter.yaml"
     kube-linter lint --config "$KUBE_LINTER_CONFIG" "$rendered"
   fi
 }

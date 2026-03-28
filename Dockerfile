@@ -7,6 +7,10 @@ RUN go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
 FROM alpine:3.21
 RUN apk add --no-cache bash curl git tar
 COPY --from=builder /go/bin/yq /go/bin/kube-linter /go/bin/kustomize /usr/local/bin/
+COPY tools/ /usr/local/lib/actions-k8s-ci/
+COPY .kube-linter.yaml /usr/local/lib/actions-k8s-ci/.kube-linter.yaml
+RUN ln -s /usr/local/lib/actions-k8s-ci/argocd-render-application.sh /usr/local/bin/argocd-render-application \
+ && ln -s /usr/local/lib/actions-k8s-ci/argocd-diff-manifests.sh /usr/local/bin/argocd-diff-manifests
 RUN curl -sL https://get.helm.sh/helm-v4.1.3-linux-amd64.tar.gz \
     | tar xz -C /usr/local/bin --strip-components=1 linux-amd64/helm
 # --verify=false required: helm-diff does not support plugin signature verification with Helm v4

@@ -6,6 +6,7 @@ set -euo pipefail
 
 # Needed to source relative to local file path instead of caller path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/argocd.sh"
 
 check_deps # TODO - move within main fn to align with other tools
@@ -22,8 +23,8 @@ trap 'rm -rf "$BASE_DIR" "$PR_DIR" "$BASE_KEYS_FILE" "$PR_KEYS_FILE"' EXIT
 split_manifest "$BASE_FILE" "$BASE_DIR"
 split_manifest "$PR_FILE"   "$PR_DIR"
 
-ls "$BASE_DIR" 2>/dev/null | sort > "$BASE_KEYS_FILE" || true
-ls "$PR_DIR"   2>/dev/null | sort > "$PR_KEYS_FILE"   || true
+find "$BASE_DIR" -maxdepth 1 -name "*.yml" -printf '%f\n' | sort > "$BASE_KEYS_FILE" || true
+find "$PR_DIR"   -maxdepth 1 -name "*.yml" -printf '%f\n' | sort > "$PR_KEYS_FILE"   || true
 
 if [ ! -s "$BASE_KEYS_FILE" ] && [ ! -s "$PR_KEYS_FILE" ]; then
   echo "_No rendered output for either version (SKIP or unsupported source type)._"
