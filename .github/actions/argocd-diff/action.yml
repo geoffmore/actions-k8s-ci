@@ -16,6 +16,11 @@ inputs:
     required: false
     default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
 
+# Alternative design: if the calling job sets `container: <image>`, composite
+# action run: steps execute inside that container and can call tools directly
+# without docker run or bind mounts. The workspace-at-same-path mount trick
+# for worktree resolution would also be unnecessary. The `image` input would
+# be unnecessary. Deferred in favour of self-contained actions.
 runs:
   using: composite
   steps:
