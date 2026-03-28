@@ -25,7 +25,7 @@ setup_app_context "$1"
 main() {
   check_deps
 
-  rendered=$(mktemp --tmpdir=./)
+  rendered=$(mktemp)
   trap 'rm -f "$rendered"' EXIT
 
   local is_multi
