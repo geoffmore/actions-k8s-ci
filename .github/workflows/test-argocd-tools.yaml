@@ -23,5 +23,8 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/repo \
             -w /repo \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0='*' \
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest \
             testdata/argocd/test.sh

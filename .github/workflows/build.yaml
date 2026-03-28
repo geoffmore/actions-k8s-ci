@@ -16,6 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: actions-k8s-ci:candidate
+
+      - name: Run image smoke tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:candidate \
+            testdata/image/test.sh
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::245976212095:role/github-actions/geoffmore/actions-k8s-ci/ecr-push
@@ -25,7 +40,8 @@ jobs:
         with:
           registry-type: public
 
-      - uses: docker/build-push-action@v6
+      - name: Push image
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true

@@ -14,10 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build image
+        run: docker build -t actions-k8s-ci:pr .
+
       - name: Run image smoke tests
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/repo \
             -w /repo \
-            public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest \
+            actions-k8s-ci:pr \
             testdata/image/test.sh
