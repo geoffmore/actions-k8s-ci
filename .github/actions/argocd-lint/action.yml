@@ -1,0 +1,68 @@
+name: ArgoCD Lint
+description: >
+  Renders and lints ArgoCD Application manifests affected by a pull request.
+  Walks up the directory tree from each changed file to find the nearest
+  application.yaml, then renders and lints each unique application found.
+
+inputs:
+  paths:
+    description: Glob pattern scoping which changed files trigger lint (e.g. argocd/**)
+    required: true
+  kube-linter-config:
+    description: Path to kube-linter config. Defaults to repo .kube-linter.yaml, then bundled config.
+    required: false
+    default: ''
+  image:
+    description: >
+      actions-k8s-ci image to use.
+      TODO: pin to digest after build — update manually until digest automation is implemented.
+    required: false
+    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
+
+runs:
+  using: composite
+  steps:
+    - name: Get changed files
+      id: changed
+      uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+      with:
+        files: ${{ inputs.paths }}
+
+    - name: Lint affected ArgoCD Applications
+      if: steps.changed.outputs.any_changed == 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        KUBE_LINTER_CONFIG: ${{ inputs.kube-linter-config }}
+        ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+      run: |
+        find_application() {
+          local dir="$1"
+          while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+            if [ -f "$dir/application.yaml" ]; then
+              echo "$dir/application.yaml"
+              return
+            fi
+            dir="$(dirname "$dir")"
+          done
+        }
+
+        lint_args=(--lint)
+        [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--lint-config "$KUBE_LINTER_CONFIG")
+
+        declare -A seen
+        failed=0
+        for file in $ALL_CHANGED_FILES; do
+          app="$(find_application "$(dirname "$file")")"
+          if [ -n "$app" ] && [ -z "${seen[$app]:-}" ]; then
+            seen[$app]=1
+            echo "::group::Linting $app"
+            docker run --rm \
+              -v "${{ github.workspace }}:/repo" \
+              -w /repo \
+              "$IMAGE" \
+              argocd-render-application "${lint_args[@]}" "$app" || failed=1
+            echo "::endgroup::"
+          fi
+        done
+        exit $failed

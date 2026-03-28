@@ -1,0 +1,87 @@
+name: ArgoCD Diff
+description: >
+  Diffs rendered ArgoCD Application manifests between the base and PR branches.
+  Walks up the directory tree from each changed file to find the nearest
+  application.yaml, renders both sides, and posts a resource-level diff to
+  the job summary.
+
+inputs:
+  paths:
+    description: Glob pattern scoping which changed files trigger diff (e.g. argocd/**)
+    required: true
+  image:
+    description: >
+      actions-k8s-ci image to use.
+      TODO: pin to digest after build — update manually until digest automation is implemented.
+    required: false
+    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
+
+runs:
+  using: composite
+  steps:
+    - name: Get changed files
+      id: changed
+      uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+      with:
+        files: ${{ inputs.paths }}
+
+    - name: Diff affected ArgoCD Applications
+      if: steps.changed.outputs.any_changed == 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        BASE_REF: ${{ github.base_ref }}
+        ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+      run: |
+        find_application() {
+          local dir="$1"
+          while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+            if [ -f "$dir/application.yaml" ]; then
+              echo "$dir/application.yaml"
+              return
+            fi
+            dir="$(dirname "$dir")"
+          done
+        }
+
+        git fetch origin --depth 1 "$BASE_REF"
+        git worktree add /tmp/base "origin/$BASE_REF"
+
+        declare -A seen
+        for file in $ALL_CHANGED_FILES; do
+          app="$(find_application "$(dirname "$file")")"
+          if [ -n "$app" ] && [ -z "${seen[$app]:-}" ]; then
+            seen[$app]=1
+
+            echo "## Manifest Diff: \`$app\`" >> "$GITHUB_STEP_SUMMARY"
+
+            base_tmp="$(mktemp)"
+            pr_tmp="$(mktemp)"
+
+            # Mount workspace at the same absolute path so git can resolve the
+            # worktree's .git reference back to the main repo's object store.
+            docker run --rm \
+              -v "${{ github.workspace }}:${{ github.workspace }}" \
+              -v /tmp/base:/tmp/base \
+              -w /tmp/base \
+              "$IMAGE" \
+              argocd-render-application "$app" > "$base_tmp" 2>/dev/null || true
+
+            docker run --rm \
+              -v "${{ github.workspace }}:${{ github.workspace }}" \
+              -w "${{ github.workspace }}" \
+              "$IMAGE" \
+              argocd-render-application "$app" > "$pr_tmp" 2>/dev/null || true
+
+            docker run --rm \
+              -v "$base_tmp:/base.yaml:ro" \
+              -v "$pr_tmp:/pr.yaml:ro" \
+              "$IMAGE" \
+              argocd-diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
+
+            rm -f "$base_tmp" "$pr_tmp"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done
+
+        git worktree remove /tmp/base
