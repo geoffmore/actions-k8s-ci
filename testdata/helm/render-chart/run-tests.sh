@@ -30,16 +30,32 @@ run_test() {
   esac
 }
 
+check() {
+  local label="$1" pattern="$2" output="$3"
+  if echo "$output" | grep -q "$pattern"; then
+    echo "PASS: $label"
+    pass=$((pass + 1))
+  else
+    echo "FAIL: $label (pattern not found: $pattern)"
+    while IFS= read -r line; do echo "  $line"; done <<< "$output"
+    fail=$((fail + 1))
+  fi
+}
+
 cd "$REPO_ROOT"
 
 CHART="testdata/helm/render-chart/local-chart"
+VALUES="$CHART/values-override.yaml"
 
 echo "--- helm-render-chart ---"
-run_test "local-chart"      output tools/helm-render-chart.sh "$CHART"
+run_test "local-chart"        output tools/helm-render-chart.sh "$CHART"
+output="$(tools/helm-render-chart.sh --values "$VALUES" "$CHART" 2>&1)"
+check   "local-chart-values"  "extraKey: overridden" "$output"
 
 echo ""
 echo "--- helm-render-chart --lint ---"
-run_test "local-chart"      output tools/helm-render-chart.sh --lint "$CHART"
+run_test "local-chart"        output tools/helm-render-chart.sh --lint "$CHART"
+run_test "local-chart-values" output tools/helm-render-chart.sh --lint --values "$VALUES" "$CHART"
 
 echo ""
 echo "Results: $pass passed, $fail failed"

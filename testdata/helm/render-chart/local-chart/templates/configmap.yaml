@@ -5,3 +5,4 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   chart: local-chart
+  extraKey: {{ .Values.extraKey }}
