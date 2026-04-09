@@ -1,7 +1,7 @@
 #!/bin/bash
 # Diffs two rendered manifest streams (multi-doc YAML) resource-by-resource.
 # Resources keyed by (apiVersion, kind, namespace, name).
-# Usage: ./tools/argo-diff-manifests <base.yaml> <pr.yaml>
+# Usage: ./tools/diff-manifests <base.yaml> <pr.yaml>
 set -euo pipefail
 
 # Needed to source relative to local file path instead of caller path

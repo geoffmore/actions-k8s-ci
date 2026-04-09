@@ -35,25 +35,11 @@ cd "$REPO_ROOT"
 CHART="testdata/helm/render-chart/local-chart"
 
 echo "--- helm-render-chart ---"
-run_test "local-chart" output tools/helm-render-chart.sh "$CHART"
-
-# --ref requires the chart to be committed; skip gracefully when running against
-# an uncommitted working tree (e.g., local development before first commit).
-if git ls-files --error-unmatch "$CHART/Chart.yaml" >/dev/null 2>&1; then
-  run_test "local-chart-ref-HEAD" output tools/helm-render-chart.sh --ref HEAD "$CHART"
-else
-  echo "SKIP: local-chart-ref-HEAD (chart not yet committed)"
-fi
+run_test "local-chart"      output tools/helm-render-chart.sh "$CHART"
 
 echo ""
 echo "--- helm-render-chart --lint ---"
-run_test "local-chart" output tools/helm-render-chart.sh --lint "$CHART"
-
-if git ls-files --error-unmatch "$CHART/Chart.yaml" >/dev/null 2>&1; then
-  run_test "local-chart-ref-HEAD --lint" output tools/helm-render-chart.sh --lint --ref HEAD "$CHART"
-else
-  echo "SKIP: local-chart-ref-HEAD --lint (chart not yet committed)"
-fi
+run_test "local-chart"      output tools/helm-render-chart.sh --lint "$CHART"
 
 echo ""
 echo "Results: $pass passed, $fail failed"

@@ -17,7 +17,7 @@ RUN helm plugin install --verify=false https://github.com/databus23/helm-diff
 COPY tools/ /usr/local/lib/actions-k8s-ci/
 COPY .kube-linter.yaml /usr/local/lib/actions-k8s-ci/.kube-linter.yaml
 RUN ln -s /usr/local/lib/actions-k8s-ci/argocd-render-application.sh /usr/local/bin/argocd-render-application \
- && ln -s /usr/local/lib/actions-k8s-ci/argocd-diff-manifests.sh /usr/local/bin/argocd-diff-manifests \
+ && ln -s /usr/local/lib/actions-k8s-ci/diff-manifests.sh /usr/local/bin/diff-manifests \
  && ln -s /usr/local/lib/actions-k8s-ci/helm-render-chart.sh /usr/local/bin/helm-render-chart
 RUN addgroup -g 1000 ci && adduser -D -u 1000 -G ci ci
 USER ci

@@ -2,8 +2,8 @@ name: Helm Chart Diff
 description: >
   Diffs rendered Helm chart manifests between the base and PR branches.
   Walks up the directory tree from each changed file to find the nearest
-  Chart.yaml, renders both sides via git ref, and posts a resource-level
-  diff to the job summary.
+  Chart.yaml, renders both sides, and posts a resource-level diff to
+  the job summary.
 
 inputs:
   paths:
@@ -45,6 +45,7 @@ runs:
         }
 
         git fetch origin --depth 1 "$BASE_REF"
+        git worktree add /tmp/base "origin/$BASE_REF"
 
         declare -A seen
         for file in $ALL_CHANGED_FILES; do
@@ -59,9 +60,10 @@ runs:
 
             docker run --rm \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
-              -w "${{ github.workspace }}" \
+              -v /tmp/base:/tmp/base \
+              -w /tmp/base \
               "$IMAGE" \
-              helm-render-chart --ref "origin/$BASE_REF" "$chart" > "$base_tmp" 2>/dev/null || true
+              helm-render-chart "$chart" > "$base_tmp" 2>/dev/null || true
 
             docker run --rm \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
@@ -73,9 +75,11 @@ runs:
               -v "$base_tmp:/base.yaml:ro" \
               -v "$pr_tmp:/pr.yaml:ro" \
               "$IMAGE" \
-              argocd-diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
+              diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
 
             rm -f "$base_tmp" "$pr_tmp"
             echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
         done
+
+        git worktree remove /tmp/base
