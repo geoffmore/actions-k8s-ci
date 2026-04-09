@@ -67,7 +67,10 @@ runs:
           if [ -n "$app" ] && [ -z "${seen[$app]:-}" ]; then
             seen[$app]=1
 
-            echo "## Manifest Diff: \`$app\`" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "---"
+              echo "## Manifest Diff: \`$app\`"
+            } >> "$GITHUB_STEP_SUMMARY"
 
             base_tmp="$(mktemp)"
             pr_tmp="$(mktemp)"
@@ -100,10 +103,11 @@ runs:
               if [ "$lint_rc" -ne 0 ]; then
                 failed=1
                 {
-                  echo "### Lint: \`$app\`"
-                  echo '```'
-                  echo "$lint_output"
-                  echo '```'
+                  echo ""
+                  echo "> [!WARNING]"
+                  echo "> **Lint issues**"
+                  echo "$lint_output" | while IFS= read -r line; do echo "> $line"; done
+                  echo ""
                 } >> "$GITHUB_STEP_SUMMARY"
               fi
             fi
