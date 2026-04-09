@@ -55,6 +55,23 @@ check() {
 check "not running as root" "ci" "$(whoami)"
 
 echo ""
+echo "--- symlink execution (sourcing through symlinks) ---"
+CHART="testdata/helm/render-chart/local-chart"
+check_exec() {
+  local label="$1"; shift
+  if output=$("$@" 2>&1) && [ -n "$output" ]; then
+    echo "PASS: $label"
+    pass=$((pass + 1))
+  else
+    echo "FAIL: $label"
+    while IFS= read -r line; do echo "  $line"; done <<< "$output"
+    fail=$((fail + 1))
+  fi
+}
+check_exec "helm-render-chart via symlink" helm-render-chart "$CHART"
+check_exec "diff-manifests via symlink"    diff-manifests /dev/null /dev/null
+
+echo ""
 echo "--- bundled config ---"
 check_file "bundled .kube-linter.yaml" /usr/local/lib/actions-k8s-ci/.kube-linter.yaml
 
