@@ -86,3 +86,9 @@ public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
 public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:<git-sha>
 public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:r<run-number>
 ```
+
+## Planned
+
+- **`kustomize-diff`** — diff action for plain Kustomize directories (no ArgoCD Application wrapper), following the same `*-diff` pattern
+- **`fluxcd-diff`** — diff action for FluxCD `HelmRelease` resources
+- **Plain manifest diff** — diff action for unrendered YAML directories (no Helm or Kustomize rendering needed)
