@@ -91,11 +91,21 @@ runs:
               lint_args=(kube-linter lint)
               [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
               echo "::group::Linting $app"
-              docker run --rm --user "$(id -u):$(id -g)" \
+              lint_output="$(docker run --rm --user "$(id -u):$(id -g)" \
                 -v "$pr_tmp:/pr.yaml:ro" \
                 "$IMAGE" \
-                "${lint_args[@]}" /pr.yaml || failed=1
+                "${lint_args[@]}" /pr.yaml 2>&1)" && lint_rc=0 || lint_rc=$?
+              echo "$lint_output"
               echo "::endgroup::"
+              if [ "$lint_rc" -ne 0 ]; then
+                failed=1
+                {
+                  echo "### Lint: \`$app\`"
+                  echo '```'
+                  echo "$lint_output"
+                  echo '```'
+                } >> "$GITHUB_STEP_SUMMARY"
+              fi
             fi
 
             docker run --rm --user "$(id -u):$(id -g)" \
