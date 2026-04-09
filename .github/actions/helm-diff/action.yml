@@ -1,0 +1,81 @@
+name: Helm Chart Diff
+description: >
+  Diffs rendered Helm chart manifests between the base and PR branches.
+  Walks up the directory tree from each changed file to find the nearest
+  Chart.yaml, renders both sides via git ref, and posts a resource-level
+  diff to the job summary.
+
+inputs:
+  paths:
+    description: Glob pattern scoping which changed files trigger diff (e.g. charts/**)
+    required: true
+  image:
+    description: >
+      actions-k8s-ci image to use.
+      TODO: pin to digest after build — update manually until digest automation is implemented.
+    required: false
+    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
+
+runs:
+  using: composite
+  steps:
+    - name: Get changed files
+      id: changed
+      uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+      with:
+        files: ${{ inputs.paths }}
+
+    - name: Diff affected Helm charts
+      if: steps.changed.outputs.any_changed == 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        BASE_REF: ${{ github.base_ref }}
+        ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+      run: |
+        find_chart() {
+          local dir="$1"
+          while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+            if [ -f "$dir/Chart.yaml" ]; then
+              echo "$dir"
+              return
+            fi
+            dir="$(dirname "$dir")"
+          done
+        }
+
+        git fetch origin --depth 1 "$BASE_REF"
+
+        declare -A seen
+        for file in $ALL_CHANGED_FILES; do
+          chart="$(find_chart "$(dirname "$file")")"
+          if [ -n "$chart" ] && [ -z "${seen[$chart]:-}" ]; then
+            seen[$chart]=1
+
+            echo "## Manifest Diff: \`$chart\`" >> "$GITHUB_STEP_SUMMARY"
+
+            base_tmp="$(mktemp)"
+            pr_tmp="$(mktemp)"
+
+            docker run --rm \
+              -v "${{ github.workspace }}:${{ github.workspace }}" \
+              -w "${{ github.workspace }}" \
+              "$IMAGE" \
+              helm-render-chart --ref "origin/$BASE_REF" "$chart" > "$base_tmp" 2>/dev/null || true
+
+            docker run --rm \
+              -v "${{ github.workspace }}:${{ github.workspace }}" \
+              -w "${{ github.workspace }}" \
+              "$IMAGE" \
+              helm-render-chart "$chart" > "$pr_tmp" 2>/dev/null || true
+
+            docker run --rm \
+              -v "$base_tmp:/base.yaml:ro" \
+              -v "$pr_tmp:/pr.yaml:ro" \
+              "$IMAGE" \
+              argocd-diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
+
+            rm -f "$base_tmp" "$pr_tmp"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done

@@ -23,3 +23,6 @@ run testdata/image/test.sh
 
 echo ""
 run testdata/argocd/test.sh
+
+echo ""
+run testdata/helm/test.sh

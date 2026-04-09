@@ -38,6 +38,7 @@ echo ""
 echo "--- symlinked scripts ---"
 check_cmd "argocd-render-application" argocd-render-application
 check_cmd "argocd-diff-manifests"     argocd-diff-manifests
+check_cmd "helm-render-chart"         helm-render-chart
 
 echo ""
 echo "--- runtime user ---"
