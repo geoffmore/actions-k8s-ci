@@ -74,14 +74,14 @@ runs:
 
             # Mount workspace at the same absolute path so git can resolve the
             # worktree's .git reference back to the main repo's object store.
-            docker run --rm \
+            docker run --rm --user "$(id -u):$(id -g)" \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
               -v /tmp/base:/tmp/base \
               -w /tmp/base \
               "$IMAGE" \
               argocd-render-application "$app" > "$base_tmp" 2>/dev/null || true
 
-            docker run --rm \
+            docker run --rm --user "$(id -u):$(id -g)" \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
               -w "${{ github.workspace }}" \
               "$IMAGE" \
@@ -91,14 +91,14 @@ runs:
               lint_args=(kube-linter lint)
               [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
               echo "::group::Linting $app"
-              docker run --rm \
+              docker run --rm --user "$(id -u):$(id -g)" \
                 -v "$pr_tmp:/pr.yaml:ro" \
                 "$IMAGE" \
                 "${lint_args[@]}" /pr.yaml || failed=1
               echo "::endgroup::"
             fi
 
-            docker run --rm \
+            docker run --rm --user "$(id -u):$(id -g)" \
               -v "$base_tmp:/base.yaml:ro" \
               -v "$pr_tmp:/pr.yaml:ro" \
               "$IMAGE" \

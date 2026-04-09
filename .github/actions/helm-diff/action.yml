@@ -94,7 +94,7 @@ runs:
               base_tmp="$(mktemp)"
               pr_tmp="$(mktemp)"
 
-              docker run --rm \
+              docker run --rm --user "$(id -u):$(id -g)" \
                 -v "${{ github.workspace }}:${{ github.workspace }}" \
                 -v /tmp/base:/tmp/base \
                 -w /tmp/base \
@@ -102,7 +102,7 @@ runs:
                 helm-render-chart "${extra_args[@]+"${extra_args[@]}"}" "$chart" \
                 > "$base_tmp" 2>/dev/null || true
 
-              docker run --rm \
+              docker run --rm --user "$(id -u):$(id -g)" \
                 -v "${{ github.workspace }}:${{ github.workspace }}" \
                 -w "${{ github.workspace }}" \
                 "$IMAGE" \
@@ -113,14 +113,14 @@ runs:
                 lint_args=(kube-linter lint)
                 [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
                 echo "::group::Linting $label"
-                docker run --rm \
+                docker run --rm --user "$(id -u):$(id -g)" \
                   -v "$pr_tmp:/pr.yaml:ro" \
                   "$IMAGE" \
                   "${lint_args[@]}" /pr.yaml || failed=1
                 echo "::endgroup::"
               fi
 
-              docker run --rm \
+              docker run --rm --user "$(id -u):$(id -g)" \
                 -v "$base_tmp:/base.yaml:ro" \
                 -v "$pr_tmp:/pr.yaml:ro" \
                 "$IMAGE" \
