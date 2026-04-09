@@ -25,4 +25,7 @@ echo ""
 run testdata/argocd/test.sh
 
 echo ""
+run testdata/diff-manifests/run-tests.sh
+
+echo ""
 run testdata/helm/test.sh

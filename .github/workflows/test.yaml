@@ -1,8 +1,9 @@
 # Testing strategy
 #
 # Image layer:  testdata/image/test.sh    — smoke tests binaries, symlinks, bundled config
-# Script layer: testdata/argocd/test.sh   — render, lint, and diff against local fixtures
-#               testdata/helm/test.sh     — helm-render-chart against local fixtures
+# Script layer: testdata/argocd/test.sh         — argocd-render-application against local fixtures
+#               testdata/diff-manifests/run-tests.sh — diff-manifests against local fixtures
+#               testdata/helm/test.sh               — helm-render-chart against local fixtures
 #
 # Action layer: NOT tested here.
 #   Composite actions (.github/actions/argocd-lint, argocd-diff, helm-diff) depend on GHA
@@ -55,6 +56,14 @@ jobs:
             -w /repo \
             actions-k8s-ci:pr \
             testdata/argocd/test.sh
+
+      - name: Run diff-manifests tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/diff-manifests/run-tests.sh
 
       - name: Run Helm tool tests
         run: |

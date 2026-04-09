@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs diff-manifests against test fixtures and checks output.
-# Usage: ./testdata/argocd/diff-manifests/run-tests.sh
+# Usage: ./testdata/diff-manifests/run-tests.sh
 # Run from the repository root.
 set -euo pipefail
 
@@ -36,8 +36,8 @@ check_absent() {
 
 cd "$REPO_ROOT"
 
-BASE="testdata/argocd/diff-manifests/base.yaml"
-PR="testdata/argocd/diff-manifests/pr.yaml"
+BASE="testdata/diff-manifests/base.yaml"
+PR="testdata/diff-manifests/pr.yaml"
 
 echo "--- diff-manifests ---"
 output="$(tools/diff-manifests.sh "$BASE" "$PR" 2>&1)"
