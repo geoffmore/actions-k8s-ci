@@ -45,17 +45,29 @@ check() {
 cd "$REPO_ROOT"
 
 CHART="testdata/helm/render-chart/local-chart"
-VALUES="$CHART/values-override.yaml"
 
 echo "--- helm-render-chart ---"
-run_test "local-chart"        output tools/helm-render-chart.sh "$CHART"
-output="$(tools/helm-render-chart.sh --values "$VALUES" "$CHART" 2>&1)"
-check   "local-chart-values"  "extraKey: overridden" "$output"
+output="$(tools/helm-render-chart.sh "$CHART" 2>&1)"
+check "default (values.yaml only)"    "extraKey: default"    "$output"
+
+output="$(tools/helm-render-chart.sh --extra-values stage.values.yaml "$CHART" 2>&1)"
+check "extra-values stage.values.yaml" "extraKey: stage"     "$output"
+
+output="$(tools/helm-render-chart.sh --extra-values test.values.yaml "$CHART" 2>&1)"
+check "extra-values test.values.yaml"  "extraKey: test"      "$output"
+
+output="$(tools/helm-render-chart.sh --extra-values values-override.yaml "$CHART" 2>&1)"
+check "extra-values values-override"   "extraKey: overridden" "$output"
+
+# Missing extra-values file should be silently skipped, falling back to defaults
+output="$(tools/helm-render-chart.sh --extra-values nonexistent.values.yaml "$CHART" 2>&1)"
+check "extra-values missing file skipped" "extraKey: default" "$output"
 
 echo ""
 echo "--- helm-render-chart --lint ---"
-run_test "local-chart"        output tools/helm-render-chart.sh --lint "$CHART"
-run_test "local-chart-values" output tools/helm-render-chart.sh --lint --values "$VALUES" "$CHART"
+run_test "default"              output tools/helm-render-chart.sh --lint "$CHART"
+run_test "extra-values stage"   output tools/helm-render-chart.sh --lint --extra-values stage.values.yaml "$CHART"
+run_test "extra-values test"    output tools/helm-render-chart.sh --lint --extra-values test.values.yaml "$CHART"
 
 echo ""
 echo "Results: $pass passed, $fail failed"

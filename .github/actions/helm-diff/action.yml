@@ -9,6 +9,13 @@ inputs:
   paths:
     description: Glob pattern scoping which changed files trigger diff (e.g. charts/**)
     required: true
+  extra-values:
+    description: >
+      Space-separated list of extra values files (relative to chart root) to layer
+      on top of values.yaml. E.g. "stage.values.yaml" or "stage.values.yaml test.values.yaml".
+      Files that do not exist are silently skipped.
+    required: false
+    default: ''
   lint:
     description: Run kube-linter on the PR render and fail the step if issues are found.
     required: false
@@ -40,6 +47,7 @@ runs:
         IMAGE: ${{ inputs.image }}
         BASE_REF: ${{ github.base_ref }}
         ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+        EXTRA_VALUES: ${{ inputs.extra-values }}
         LINT: ${{ inputs.lint }}
         KUBE_LINTER_CONFIG: ${{ inputs.kube-linter-config }}
       run: |
@@ -54,6 +62,15 @@ runs:
           done
         }
 
+        build_extra_values_args() {
+          local chart="$1"
+          local args=()
+          for f in $EXTRA_VALUES; do
+            args+=(--extra-values "$f")
+          done
+          echo "${args[@]+"${args[@]}"}"
+        }
+
         git fetch origin --depth 1 "$BASE_REF"
         git worktree add /tmp/base "origin/$BASE_REF"
 
@@ -63,6 +80,9 @@ runs:
           chart="$(find_chart "$(dirname "$file")")"
           if [ -n "$chart" ] && [ -z "${seen[$chart]:-}" ]; then
             seen[$chart]=1
+
+            # shellcheck disable=SC2046
+            extra_values_args=($(build_extra_values_args "$chart"))
 
             echo "## Manifest Diff: \`$chart\`" >> "$GITHUB_STEP_SUMMARY"
 
@@ -74,13 +94,15 @@ runs:
               -v /tmp/base:/tmp/base \
               -w /tmp/base \
               "$IMAGE" \
-              helm-render-chart "$chart" > "$base_tmp" 2>/dev/null || true
+              helm-render-chart "${extra_values_args[@]+"${extra_values_args[@]}"}" "$chart" \
+              > "$base_tmp" 2>/dev/null || true
 
             docker run --rm \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
               -w "${{ github.workspace }}" \
               "$IMAGE" \
-              helm-render-chart "$chart" > "$pr_tmp" 2>/dev/null || true
+              helm-render-chart "${extra_values_args[@]+"${extra_values_args[@]}"}" "$chart" \
+              > "$pr_tmp" 2>/dev/null || true
 
             if [ "$LINT" = "true" ]; then
               lint_args=(kube-linter lint)
