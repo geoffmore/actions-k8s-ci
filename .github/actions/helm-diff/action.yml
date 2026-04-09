@@ -2,8 +2,9 @@ name: Helm Chart Diff
 description: >
   Diffs rendered Helm chart manifests between the base and PR branches.
   Walks up the directory tree from each changed file to find the nearest
-  Chart.yaml, renders both sides, and posts a resource-level diff to
-  the job summary. Optionally lints the PR render with kube-linter.
+  Chart.yaml, then produces a manifest diff for each render scenario:
+  default (values.yaml only), plus one scenario per extra-values file.
+  Results are posted to the job summary. Optionally lints each PR render.
 
 inputs:
   paths:
@@ -11,13 +12,14 @@ inputs:
     required: true
   extra-values:
     description: >
-      Space-separated list of extra values files (relative to chart root) to layer
-      on top of values.yaml. E.g. "stage.values.yaml" or "stage.values.yaml test.values.yaml".
-      Files that do not exist are silently skipped.
+      Space-separated list of extra values files (relative to chart root).
+      Each file produces an independent render scenario layered on top of
+      values.yaml. Files absent from a chart are silently skipped for that chart.
+      E.g. "stage.values.yaml test.values.yaml"
     required: false
     default: ''
   lint:
-    description: Run kube-linter on the PR render and fail the step if issues are found.
+    description: Run kube-linter on each PR render and fail the step if issues are found.
     required: false
     default: 'false'
   kube-linter-config:
@@ -62,17 +64,15 @@ runs:
           done
         }
 
-        build_extra_values_args() {
-          local chart="$1"
-          local args=()
-          for f in $EXTRA_VALUES; do
-            args+=(--extra-values "$f")
-          done
-          echo "${args[@]+"${args[@]}"}"
-        }
-
         git fetch origin --depth 1 "$BASE_REF"
         git worktree add /tmp/base "origin/$BASE_REF"
+
+        # Always render the default scenario; append one scenario per extra-values file.
+        # Empty string sentinel represents the default (no extra-values).
+        scenarios=("")
+        for f in $EXTRA_VALUES; do
+          scenarios+=("$f")
+        done
 
         declare -A seen
         failed=0
@@ -81,48 +81,55 @@ runs:
           if [ -n "$chart" ] && [ -z "${seen[$chart]:-}" ]; then
             seen[$chart]=1
 
-            # shellcheck disable=SC2046
-            extra_values_args=($(build_extra_values_args "$chart"))
+            for scenario in "${scenarios[@]}"; do
+              if [ -z "$scenario" ]; then
+                extra_args=()
+                label="$chart"
+              else
+                extra_args=(--extra-values "$scenario")
+                label="$chart ($scenario)"
+              fi
 
-            echo "## Manifest Diff: \`$chart\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "## Manifest Diff: \`$label\`" >> "$GITHUB_STEP_SUMMARY"
 
-            base_tmp="$(mktemp)"
-            pr_tmp="$(mktemp)"
+              base_tmp="$(mktemp)"
+              pr_tmp="$(mktemp)"
 
-            docker run --rm \
-              -v "${{ github.workspace }}:${{ github.workspace }}" \
-              -v /tmp/base:/tmp/base \
-              -w /tmp/base \
-              "$IMAGE" \
-              helm-render-chart "${extra_values_args[@]+"${extra_values_args[@]}"}" "$chart" \
-              > "$base_tmp" 2>/dev/null || true
-
-            docker run --rm \
-              -v "${{ github.workspace }}:${{ github.workspace }}" \
-              -w "${{ github.workspace }}" \
-              "$IMAGE" \
-              helm-render-chart "${extra_values_args[@]+"${extra_values_args[@]}"}" "$chart" \
-              > "$pr_tmp" 2>/dev/null || true
-
-            if [ "$LINT" = "true" ]; then
-              lint_args=(kube-linter lint)
-              [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
-              echo "::group::Linting $chart"
               docker run --rm \
+                -v "${{ github.workspace }}:${{ github.workspace }}" \
+                -v /tmp/base:/tmp/base \
+                -w /tmp/base \
+                "$IMAGE" \
+                helm-render-chart "${extra_args[@]+"${extra_args[@]}"}" "$chart" \
+                > "$base_tmp" 2>/dev/null || true
+
+              docker run --rm \
+                -v "${{ github.workspace }}:${{ github.workspace }}" \
+                -w "${{ github.workspace }}" \
+                "$IMAGE" \
+                helm-render-chart "${extra_args[@]+"${extra_args[@]}"}" "$chart" \
+                > "$pr_tmp" 2>/dev/null || true
+
+              if [ "$LINT" = "true" ]; then
+                lint_args=(kube-linter lint)
+                [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
+                echo "::group::Linting $label"
+                docker run --rm \
+                  -v "$pr_tmp:/pr.yaml:ro" \
+                  "$IMAGE" \
+                  "${lint_args[@]}" /pr.yaml || failed=1
+                echo "::endgroup::"
+              fi
+
+              docker run --rm \
+                -v "$base_tmp:/base.yaml:ro" \
                 -v "$pr_tmp:/pr.yaml:ro" \
                 "$IMAGE" \
-                "${lint_args[@]}" /pr.yaml || failed=1
-              echo "::endgroup::"
-            fi
+                diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
 
-            docker run --rm \
-              -v "$base_tmp:/base.yaml:ro" \
-              -v "$pr_tmp:/pr.yaml:ro" \
-              "$IMAGE" \
-              diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
-
-            rm -f "$base_tmp" "$pr_tmp"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
+              rm -f "$base_tmp" "$pr_tmp"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+            done
           fi
         done
 
