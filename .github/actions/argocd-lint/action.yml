@@ -15,7 +15,6 @@ inputs:
   image:
     description: >
       actions-k8s-ci image to use.
-      TODO: pin to digest after build — update manually until digest automation is implemented.
     required: false
     default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
 

@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write  # required for OIDC
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -41,6 +41,7 @@ jobs:
           registry-type: public
 
       - name: Push image
+        id: push
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
@@ -49,3 +50,20 @@ jobs:
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:${{ github.sha }}
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:r${{ github.run_number }}
+
+      - name: Pin image digest in action defaults
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE: public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci
+        run: |
+          pinned="${IMAGE}@${DIGEST}"
+          find .github/actions -name 'action.yml' | xargs sed -i \
+            "s|default: '${IMAGE}[^']*'|default: '${pinned}'|g"
+
+      - name: Commit pinned digest
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/actions/
+          git diff --staged --quiet || git commit -m "ci: pin image digest to ${{ github.sha }} [skip ci]"
+          git push
