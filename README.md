@@ -54,17 +54,10 @@ Diffs rendered ArgoCD Application manifests between the base and PR branches. Wa
 - uses: geoffmore/actions-k8s-ci/.github/actions/argocd-diff@main
   with:
     paths: argocd/**
-```
 
-### `argocd-lint`
-
-Renders and lints ArgoCD Application manifests affected by a pull request. Fails the step if kube-linter finds issues.
-
-```yaml
-- uses: geoffmore/actions-k8s-ci/.github/actions/argocd-lint@main
-  with:
-    paths: argocd/**
-    kube-linter-config: .kube-linter.yaml  # optional
+    # Optional: run kube-linter on each PR render; fail if issues found
+    lint: true
+    kube-linter-config: .kube-linter.yaml
 ```
 
 ## Tools

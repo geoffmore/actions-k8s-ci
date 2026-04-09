@@ -3,15 +3,22 @@ description: >
   Diffs rendered ArgoCD Application manifests between the base and PR branches.
   Walks up the directory tree from each changed file to find the nearest
   application.yaml, renders both sides, and posts a resource-level diff to
-  the job summary.
+  the job summary. Optionally lints each PR render with kube-linter.
 
 inputs:
   paths:
     description: Glob pattern scoping which changed files trigger diff (e.g. argocd/**)
     required: true
+  lint:
+    description: Run kube-linter on each PR render and fail the step if issues are found.
+    required: false
+    default: 'false'
+  kube-linter-config:
+    description: Path to kube-linter config. Defaults to repo .kube-linter.yaml, then bundled config.
+    required: false
+    default: ''
   image:
-    description: >
-      actions-k8s-ci image to use.
+    description: actions-k8s-ci image to use.
     required: false
     default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
 
@@ -36,6 +43,8 @@ runs:
         IMAGE: ${{ inputs.image }}
         BASE_REF: ${{ github.base_ref }}
         ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+        LINT: ${{ inputs.lint }}
+        KUBE_LINTER_CONFIG: ${{ inputs.kube-linter-config }}
       run: |
         find_application() {
           local dir="$1"
@@ -52,6 +61,7 @@ runs:
         git worktree add /tmp/base "origin/$BASE_REF"
 
         declare -A seen
+        failed=0
         for file in $ALL_CHANGED_FILES; do
           app="$(find_application "$(dirname "$file")")"
           if [ -n "$app" ] && [ -z "${seen[$app]:-}" ]; then
@@ -77,6 +87,17 @@ runs:
               "$IMAGE" \
               argocd-render-application "$app" > "$pr_tmp" 2>/dev/null || true
 
+            if [ "$LINT" = "true" ]; then
+              lint_args=(kube-linter lint)
+              [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
+              echo "::group::Linting $app"
+              docker run --rm \
+                -v "$pr_tmp:/pr.yaml:ro" \
+                "$IMAGE" \
+                "${lint_args[@]}" /pr.yaml || failed=1
+              echo "::endgroup::"
+            fi
+
             docker run --rm \
               -v "$base_tmp:/base.yaml:ro" \
               -v "$pr_tmp:/pr.yaml:ro" \
@@ -89,3 +110,4 @@ runs:
         done
 
         git worktree remove /tmp/base
+        exit $failed

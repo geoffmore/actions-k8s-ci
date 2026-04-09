@@ -6,11 +6,9 @@
 #               testdata/helm/test.sh               — helm-render-chart against local fixtures
 #
 # Action layer: NOT tested here.
-#   Composite actions (.github/actions/argocd-lint, argocd-diff, helm-diff) depend on GHA
+#   Composite actions (.github/actions/argocd-diff, helm-diff) depend on GHA
 #   infrastructure (tj-actions/changed-files, git history for base ref) that
 #   cannot be meaningfully exercised outside a real pull request context.
-#   - argocd-lint: could be tested with a dedicated test workflow + fixtures
-#     under testdata/actions/ triggered on PRs touching .github/actions/**
 #   - argocd-diff, helm-diff: best tested end-to-end in a consumer repo (e.g. kubernetes),
 #     since they require actual git history between base and PR branches
 #   Local alternative: use `act` (https://github.com/nektos/act) to run
