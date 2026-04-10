@@ -69,7 +69,7 @@ check_exec() {
   fi
 }
 check_exec "helm-render-chart via symlink" helm-render-chart "$CHART"
-check_exec "diff-manifests via symlink"    diff-manifests /dev/null /dev/null
+check_exec "diff-manifests via symlink"    diff-manifests testdata/diff-manifests/base.yaml testdata/diff-manifests/pr.yaml
 
 echo ""
 echo "--- bundled config ---"
