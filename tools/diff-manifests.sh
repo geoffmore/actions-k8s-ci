@@ -11,8 +11,8 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 check_deps # TODO - move within main fn to align with other tools
 
-BASE_FILE="${1:?Usage: argo-diff-manifests <base.yaml> <pr.yaml>}"
-PR_FILE="${2:?Usage: argo-diff-manifests <base.yaml> <pr.yaml>}"
+BASE_FILE="${1:?Usage: diff-manifests <base.yaml> <pr.yaml>}"
+PR_FILE="${2:?Usage: diff-manifests <base.yaml> <pr.yaml>}"
 
 BASE_DIR="$(mktemp -d)"
 PR_DIR="$(mktemp -d)"
