@@ -88,7 +88,7 @@ runs:
               -v "${{ github.workspace }}:${{ github.workspace }}" \
               -w "${{ github.workspace }}" \
               "$IMAGE" \
-              argocd-render-application "$app" > "$pr_tmp" 2>/dev/null || true
+              argocd-render-application "$app" > "$pr_tmp"
 
             if [ "$LINT" = "true" ]; then
               lint_args=(kube-linter lint)

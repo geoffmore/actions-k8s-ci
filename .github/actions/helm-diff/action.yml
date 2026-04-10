@@ -110,7 +110,7 @@ runs:
                 -w "${{ github.workspace }}" \
                 "$IMAGE" \
                 helm-render-chart "${extra_args[@]+"${extra_args[@]}"}" "$chart" \
-                > "$pr_tmp" 2>/dev/null || true
+                > "$pr_tmp"
 
               if [ "$LINT" = "true" ]; then
                 lint_args=(kube-linter lint)
