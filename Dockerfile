@@ -7,8 +7,9 @@ RUN go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
 FROM alpine:3.21@sha256:c3f8e73fdb79deaebaa2037150150191b9dcbfba68b4a46d70103204c53f4709
 RUN apk add --no-cache bash curl git tar
 COPY --from=builder /go/bin/yq /go/bin/kube-linter /go/bin/kustomize /usr/local/bin/
-RUN curl -sL https://get.helm.sh/helm-v4.1.3-linux-amd64.tar.gz \
-    | tar xz -C /usr/local/bin --strip-components=1 linux-amd64/helm
+ARG TARGETARCH
+RUN curl -sL "https://get.helm.sh/helm-v4.1.3-linux-${TARGETARCH}.tar.gz" \
+    | tar xz -C /usr/local/bin --strip-components=1 "linux-${TARGETARCH}/helm"
 # Store helm plugins in a system-wide path accessible to any runtime UID
 ENV HELM_PLUGINS=/usr/local/share/helm/plugins
 # --verify=false required: helm-diff does not support plugin signature verification with Helm v4
