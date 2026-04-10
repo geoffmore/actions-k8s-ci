@@ -7,7 +7,7 @@ set -euo pipefail
 # Needed to source relative to local file path instead of caller path
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/argocd.sh"
+source "${SCRIPT_DIR}/lib/common.sh"
 
 check_deps # TODO - move within main fn to align with other tools
 
