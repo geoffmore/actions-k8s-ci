@@ -13,7 +13,7 @@ RUN curl -sL https://get.helm.sh/helm-v4.1.3-linux-amd64.tar.gz \
 ENV HELM_PLUGINS=/usr/local/share/helm/plugins
 # --verify=false required: helm-diff does not support plugin signature verification with Helm v4
 # https://github.com/databus23/helm-diff?tab=readme-ov-file#install
-RUN helm plugin install --verify=false https://github.com/databus23/helm-diff
+RUN helm plugin install --verify=false --version v3.15.4 https://github.com/databus23/helm-diff
 COPY tools/ /usr/local/lib/actions-k8s-ci/
 COPY .kube-linter.yaml /usr/local/lib/actions-k8s-ci/.kube-linter.yaml
 RUN ln -s /usr/local/lib/actions-k8s-ci/argocd-render-application.sh /usr/local/bin/argocd-render-application \
