@@ -17,8 +17,10 @@ setup_app_context() {
 
 render_kustomize() {
   local repo_url="$1" path="$2"
+  local norm_repo="${repo_url%.git}"
+  local norm_current="${CURRENT_REPO_URL%.git}"
 
-  if [[ "$repo_url" == *"$CURRENT_REPO_URL"* ]] || [[ "$repo_url" == *.git ]]; then
+  if [[ "$norm_repo" == "$norm_current" ]]; then
     if [ -f "$REPO_ROOT/$path/kustomization.yaml" ] || [ -f "$REPO_ROOT/$path/kustomization.yml" ]; then
       kustomize build "$REPO_ROOT/$path"
     else
@@ -37,7 +39,7 @@ render_helm() {
 
   # Check for git chart source
   if [[ "$repo_url" == *.git ]] || [[ "$repo_url" == *"github.com/"* ]] || [[ "$repo_url" == *"gitlab.com/"* ]]; then
-    if [ "$repo_url" = "$CURRENT_REPO_URL" ]; then
+    if [[ "${repo_url%.git}" == "${CURRENT_REPO_URL%.git}" ]]; then
       # Same repo — chart lives locally, already checked out
       helm template "$release_name" "$REPO_ROOT/$chart"
     else

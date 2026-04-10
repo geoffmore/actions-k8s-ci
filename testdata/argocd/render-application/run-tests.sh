@@ -45,6 +45,7 @@ cd "$REPO_ROOT"
 echo "--- argocd-render-application ---"
 run_test "kustomize-local"      output tools/argocd-render-application.sh testdata/argocd/render-application/kustomize-local/application.yaml
 run_test "plain-dir-local"      output tools/argocd-render-application.sh testdata/argocd/render-application/plain-dir-local/application.yaml
+run_test "skip-external-git"    skip   tools/argocd-render-application.sh testdata/argocd/render-application/skip-external-git/application.yaml
 run_test "skip-unknown-source"  skip   tools/argocd-render-application.sh testdata/argocd/render-application/skip-unknown-source/application.yaml
 run_test "skip-multi-no-chart"  skip   tools/argocd-render-application.sh testdata/argocd/render-application/skip-multi-no-chart/application.yaml
 
@@ -52,6 +53,7 @@ echo ""
 echo "--- argocd-render-application --lint ---"
 run_test "kustomize-local"      output tools/argocd-render-application.sh --lint testdata/argocd/render-application/kustomize-local/application.yaml
 run_test "plain-dir-local"      output tools/argocd-render-application.sh --lint testdata/argocd/render-application/plain-dir-local/application.yaml
+run_test "skip-external-git"    skip   tools/argocd-render-application.sh --lint testdata/argocd/render-application/skip-external-git/application.yaml
 run_test "skip-unknown-source"  skip   tools/argocd-render-application.sh --lint testdata/argocd/render-application/skip-unknown-source/application.yaml
 run_test "skip-multi-no-chart"  skip   tools/argocd-render-application.sh --lint testdata/argocd/render-application/skip-multi-no-chart/application.yaml
 
