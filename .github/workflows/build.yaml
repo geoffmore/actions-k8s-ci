@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - Dockerfile
+      - tools/**
+      - .kube-linter.yaml
   workflow_dispatch:
 
 jobs:
