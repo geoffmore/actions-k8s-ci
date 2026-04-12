@@ -116,7 +116,7 @@ runs:
               -v "$base_tmp:/base.yaml:ro" \
               -v "$pr_tmp:/pr.yaml:ro" \
               "$IMAGE" \
-              diff-manifests /base.yaml /pr.yaml >> "$GITHUB_STEP_SUMMARY"
+              diff-manifests /base.yaml /pr.yaml | tee -a "$GITHUB_STEP_SUMMARY"
 
             rm -f "$base_tmp" "$pr_tmp"
             echo "" >> "$GITHUB_STEP_SUMMARY"
