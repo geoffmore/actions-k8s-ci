@@ -23,6 +23,34 @@ key_to_label() {
   fi
 }
 
+# Max lines per resource diff block before truncation.
+# TODO: consider rewriting diff-manifests in Go for proper size tracking
+# against the 1MB GITHUB_STEP_SUMMARY limit rather than per-resource line caps.
+MAX_DIFF_LINES=200
+
+emit_diff_block() {
+  local action="$1" label="$2" content="$3"
+  local line_count
+  line_count="$(echo "$content" | wc -l)"
+  echo "<details>"
+  echo "<summary>${action}: <code>$label</code></summary>"
+  echo ""
+  if [ "$line_count" -gt "$MAX_DIFF_LINES" ]; then
+    echo '```diff'
+    echo "$content" | head -n "$MAX_DIFF_LINES"
+    echo '```'
+    echo ""
+    echo "_(${line_count} lines total, truncated to ${MAX_DIFF_LINES})_"
+  else
+    echo '```diff'
+    echo "$content"
+    echo '```'
+  fi
+  echo ""
+  echo "</details>"
+  echo ""
+}
+
 main() {
   check_deps
 
@@ -60,15 +88,7 @@ main() {
       any_output=1
       local label
       label="$(key_to_label "$key")"
-      echo "<details>"
-      echo "<summary>REMOVED: <code>$label</code></summary>"
-      echo ""
-      echo '```diff'
-      sed 's/^/- /' "$BASE_DIR/$key"
-      echo '```'
-      echo ""
-      echo "</details>"
-      echo ""
+      emit_diff_block "REMOVED" "$label" "$(sed 's/^/- /' "$BASE_DIR/$key")"
     done <<< "$REMOVED"
   fi
 
@@ -78,15 +98,7 @@ main() {
       any_output=1
       local label
       label="$(key_to_label "$key")"
-      echo "<details>"
-      echo "<summary>ADDED: <code>$label</code></summary>"
-      echo ""
-      echo '```diff'
-      sed 's/^/+ /' "$PR_DIR/$key"
-      echo '```'
-      echo ""
-      echo "</details>"
-      echo ""
+      emit_diff_block "ADDED" "$label" "$(sed 's/^/+ /' "$PR_DIR/$key")"
     done <<< "$ADDED"
   fi
 
@@ -101,15 +113,7 @@ main() {
         "$BASE_DIR/$key" "$PR_DIR/$key" || true)"
       if [ -n "$resource_diff" ]; then
         any_output=1
-        echo "<details>"
-        echo "<summary>MODIFIED: <code>$label</code></summary>"
-        echo ""
-        echo '```diff'
-        echo "$resource_diff"
-        echo '```'
-        echo ""
-        echo "</details>"
-        echo ""
+        emit_diff_block "MODIFIED" "$label" "$resource_diff"
       else
         unchanged_count=$((unchanged_count + 1))
       fi
