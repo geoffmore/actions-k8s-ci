@@ -1,0 +1,72 @@
+# Testing strategy
+#
+# Image layer:  testdata/image/test.sh    — smoke tests binaries, symlinks, bundled config
+# Script layer: testdata/argocd/test.sh         — argocd-render-application against local fixtures
+#               testdata/diff-manifests/run-tests.sh — diff-manifests against local fixtures
+#               testdata/helm/test.sh               — helm-render-chart against local fixtures
+#
+# Action layer: NOT tested here.
+#   Composite actions (.github/actions/argocd-diff, helm-diff) depend on GHA
+#   infrastructure (tj-actions/changed-files, git history for base ref) that
+#   cannot be meaningfully exercised outside a real pull request context.
+#   - argocd-diff, helm-diff: best tested end-to-end in a consumer repo (e.g. kubernetes),
+#     since they require actual git history between base and PR branches
+#   Local alternative: use `act` (https://github.com/nektos/act) to run
+#   workflows locally, though some GHA behaviours differ.
+
+name: test
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - tools/**
+      - testdata/**
+      - .kube-linter.yaml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build image
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          load: true
+          tags: actions-k8s-ci:pr
+
+      - name: Run image smoke tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/image/test.sh
+
+      - name: Run ArgoCD tool tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/argocd/test.sh
+
+      - name: Run diff-manifests tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/diff-manifests/run-tests.sh
+
+      - name: Run Helm tool tests
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:pr \
+            testdata/helm/test.sh
