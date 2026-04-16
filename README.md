@@ -1,5 +1,8 @@
 # actions-k8s-ci
 
+[![Build Status](https://github.com/geoffmore/actions-k8s-ci/actions/workflows/test.yaml/badge.svg)](https://github.com/geoffmore/actions-k8s-ci/actions/workflows/test.yaml)
+[![license](https://img.shields.io/github/license/geoffmore/actions-k8s-ci.svg)](LICENSE)
+
 ## What it is
 
 This repo is intended to mimic [helm diff](https://github.com/databus23/helm-diff), but offline (from a kubernetes cluster) 
@@ -86,6 +89,10 @@ public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
 public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:<git-sha>
 public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:r<run-number>
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on reporting bugs, requesting features, and submitting changes.
 
 ## Planned
 
