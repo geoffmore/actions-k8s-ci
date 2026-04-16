@@ -22,5 +22,7 @@ RUN ln -s /usr/local/lib/actions-k8s-ci/argocd-render-application.sh /usr/local/
  && ln -s /usr/local/lib/actions-k8s-ci/helm-render-chart.sh /usr/local/bin/helm-render-chart
 RUN addgroup -g 1000 ci && adduser -D -u 1000 -G ci ci
 USER ci
-# Allow git to operate on bind-mounted workspaces owned by a different UID (e.g. CI runners)
+# Allow git to operate on bind-mounted workspaces owned by a different UID
+# (e.g. CI runners). This disables git's ownership checks globally — acceptable
+# for a single-purpose CI image but this image should not be used interactively.
 RUN git config --global --add safe.directory '*'
