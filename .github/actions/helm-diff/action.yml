@@ -30,7 +30,7 @@ inputs:
     description: >
       actions-k8s-ci image to use.
     required: false
-    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest'
+    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci@sha256:7e1a735aa1307f6418d4399f6b1488ad7ae887db55c3a920e55349cb28444660'
 
 runs:
   using: composite
