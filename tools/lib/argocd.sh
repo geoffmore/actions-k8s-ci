@@ -64,7 +64,10 @@ render_helm() {
   done
 
   if [[ "$repo_url" == oci://* ]]; then
-    helm template "$release_name" "${repo_url}/${chart}" --version "$version" "${value_flags[@]+"${value_flags[@]}"}"
+    local oci_ref="$repo_url"
+    # For OCI, chart may be empty or "." — repoURL is the full reference
+    [[ -n "$chart" && "$chart" != "." ]] && oci_ref="${repo_url}/${chart}"
+    helm template "$release_name" "$oci_ref" --version "$version" "${value_flags[@]+"${value_flags[@]}"}"
   else
     local repo_alias="tmp-$$"
     helm repo add "$repo_alias" "$repo_url" --force-update >/dev/null
@@ -100,14 +103,17 @@ handle_single_source() {
 
 handle_multi_source() {
   local app_file="${1}"
+  # Match sources that are Helm-based: either has a "chart" key or a "helm" key
+  # (OCI sources use helm without chart)
+  local selector='select(has("chart") or has("helm"))'
   local repo_url chart version release_name
-  repo_url=$(yq '.spec.sources[] | select(has("chart")) | .repoURL' "${app_file}")
-  chart=$(yq '.spec.sources[] | select(has("chart")) | .chart // .path // ""' "${app_file}")
-  version=$(yq '.spec.sources[] | select(has("chart")) | .targetRevision // "latest"' "${app_file}")
-  release_name=$(yq '.spec.sources[] | select(has("chart")) | .helm.releaseName // "release"' "${app_file}")
+  repo_url=$(yq ".spec.sources[] | ${selector} | .repoURL" "${app_file}")
+  chart=$(yq ".spec.sources[] | ${selector} | .chart // .path // \"\"" "${app_file}")
+  version=$(yq ".spec.sources[] | ${selector} | .targetRevision // \"latest\"" "${app_file}")
+  release_name=$(yq ".spec.sources[] | ${selector} | .helm.releaseName // \"release\"" "${app_file}")
 
-  if [ -z "$chart" ]; then
-    echo "SKIP: No chart source found in multi-source Application ${app_file}." >&2
+  if [ -z "$repo_url" ]; then
+    echo "SKIP: No Helm source found in multi-source Application ${app_file}." >&2
     exit 0
   fi
 
