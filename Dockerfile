@@ -22,6 +22,12 @@ RUN ln -s /usr/local/lib/actions-k8s-ci/argocd-render-application.sh /usr/local/
  && ln -s /usr/local/lib/actions-k8s-ci/helm-render-chart.sh /usr/local/bin/helm-render-chart
 RUN addgroup -g 1000 ci && adduser -D -u 1000 -G ci ci
 USER ci
+# Callers override --user to the runner UID to preserve bind-mount ownership.
+# That UID has no /etc/passwd entry in this image, so HOME would fall back to /,
+# breaking helm's wazero plugin cache ($HOME/.cache/helm/wazero-build) and
+# kube-linter's config dir ($HOME/.config) with "mkdir: permission denied".
+# Pinning HOME to a world-writable path keeps the image UID-agnostic.
+ENV HOME=/tmp
 # Allow git to operate on bind-mounted workspaces owned by a different UID
 # (e.g. CI runners). This disables git's ownership checks globally — acceptable
 # for a single-purpose CI image but this image should not be used interactively.

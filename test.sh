@@ -18,8 +18,21 @@ run() {
     "$@"
 }
 
+# Mirrors how the composite actions invoke the image: overrides --user to the
+# caller's UID so bind-mounted workspace writes stay owned by the runner.
+run_as_runner() {
+  docker run --rm --user "$(id -u):$(id -g)" \
+    -v "$SCRIPT_DIR:/repo" \
+    -w /repo \
+    "$IMAGE" \
+    "$@"
+}
+
 echo ""
 run testdata/image/test.sh
+
+echo ""
+run_as_runner testdata/image/test-arbitrary-uid.sh
 
 echo ""
 run testdata/argocd/test.sh
