@@ -33,6 +33,14 @@ jobs:
             actions-k8s-ci:candidate \
             testdata/image/test.sh
 
+      - name: Run image smoke tests under arbitrary UID
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v ${{ github.workspace }}:/repo \
+            -w /repo \
+            actions-k8s-ci:candidate \
+            testdata/image/test-arbitrary-uid.sh
+
       - name: Run tool tests
         run: |
           docker run --rm \
