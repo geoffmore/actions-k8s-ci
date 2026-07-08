@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: write
       id-token: write  # required for OIDC
+      security-events: write  # required for uploading SARIF to the Security tab
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -29,6 +30,8 @@ jobs:
           context: .
           load: true
           tags: actions-k8s-ci:candidate
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -40,6 +43,14 @@ jobs:
           # there's nothing actionable to do about them here. Only fail on
           # CVEs where upgrading actually resolves something.
           ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          sarif_file: trivy-results.sarif
 
       - name: Run image smoke tests
         run: |
@@ -76,25 +87,27 @@ jobs:
             testdata/helm/test.sh
 
       # Everything below publishes the image and commits back to main, so it
-      # only runs for pushes to main - never for pull_request, whether from a
-      # branch or a fork. Fork PRs don't get an OIDC token or write access
-      # regardless (GitHub strips both for security), so this would fail loudly
-      # otherwise; gating it explicitly keeps a PR's checks green on build+scan+test
-      # alone and makes the split intentional rather than an implicit GitHub quirk.
+      # only runs for push and workflow_dispatch - never for pull_request,
+      # whether from a branch or a fork. Fork PRs don't get an OIDC token or
+      # write access regardless (GitHub strips both for security), so this
+      # would fail loudly otherwise; gating it explicitly keeps a PR's checks
+      # green on build+scan+test alone and makes the split intentional rather
+      # than an implicit GitHub quirk. Listing allowed events (rather than
+      # excluding pull_request) keeps this fail-closed as new triggers are added.
       - uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         with:
           role-to-assume: arn:aws:iam::245976212095:role/github-actions/geoffmore/actions-k8s-ci/ecr-push
           aws-region: us-east-1
 
       - uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2.1.1
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         with:
           registry-type: public
 
       - name: Push image
         id: push
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
@@ -103,9 +116,11 @@ jobs:
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:latest
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:${{ github.sha }}
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:r${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Pin image digest in action defaults
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
           IMAGE: public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci
@@ -115,7 +130,7 @@ jobs:
             "s|default: '${IMAGE}[^']*'|default: '${pinned}'|g"
 
       - name: Commit pinned digest
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
