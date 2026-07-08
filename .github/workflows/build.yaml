@@ -7,6 +7,11 @@ on:
       - Dockerfile
       - tools/**
       - .kube-linter.yaml
+  pull_request:
+    paths:
+      - Dockerfile
+      - tools/**
+      - .kube-linter.yaml
   workflow_dispatch:
 
 jobs:
@@ -24,6 +29,17 @@ jobs:
           context: .
           load: true
           tags: actions-k8s-ci:candidate
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: actions-k8s-ci:candidate
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          # Unfixed CVEs (no upstream patch available yet) shouldn't block CI -
+          # there's nothing actionable to do about them here. Only fail on
+          # CVEs where upgrading actually resolves something.
+          ignore-unfixed: true
 
       - name: Run image smoke tests
         run: |
@@ -59,17 +75,26 @@ jobs:
             actions-k8s-ci:candidate \
             testdata/helm/test.sh
 
+      # Everything below publishes the image and commits back to main, so it
+      # only runs for pushes to main - never for pull_request, whether from a
+      # branch or a fork. Fork PRs don't get an OIDC token or write access
+      # regardless (GitHub strips both for security), so this would fail loudly
+      # otherwise; gating it explicitly keeps a PR's checks green on build+scan+test
+      # alone and makes the split intentional rather than an implicit GitHub quirk.
       - uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        if: github.event_name == 'push'
         with:
           role-to-assume: arn:aws:iam::245976212095:role/github-actions/geoffmore/actions-k8s-ci/ecr-push
           aws-region: us-east-1
 
       - uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2.1.1
+        if: github.event_name == 'push'
         with:
           registry-type: public
 
       - name: Push image
         id: push
+        if: github.event_name == 'push'
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
@@ -80,6 +105,7 @@ jobs:
             public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci:r${{ github.run_number }}
 
       - name: Pin image digest in action defaults
+        if: github.event_name == 'push'
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
           IMAGE: public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci
@@ -89,6 +115,7 @@ jobs:
             "s|default: '${IMAGE}[^']*'|default: '${pinned}'|g"
 
       - name: Commit pinned digest
+        if: github.event_name == 'push'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
