@@ -1,20 +1,20 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS builder
-RUN go install github.com/mikefarah/yq/v4@v4.45.1
-RUN go install golang.stackrox.io/kube-linter/cmd/kube-linter@v0.7.2
+FROM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS builder
+RUN go install github.com/mikefarah/yq/v4@v4.53.3
+RUN go install golang.stackrox.io/kube-linter/cmd/kube-linter@v0.8.3
 RUN go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
 
 FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 RUN apk add --no-cache bash curl git tar
 COPY --from=builder /go/bin/yq /go/bin/kube-linter /go/bin/kustomize /usr/local/bin/
 ARG TARGETARCH
-RUN curl -sL "https://get.helm.sh/helm-v4.1.3-linux-${TARGETARCH}.tar.gz" \
+RUN curl -sL "https://get.helm.sh/helm-v4.2.2-linux-${TARGETARCH}.tar.gz" \
     | tar xz -C /usr/local/bin --strip-components=1 "linux-${TARGETARCH}/helm"
 # Store helm plugins in a system-wide path accessible to any runtime UID
 ENV HELM_PLUGINS=/usr/local/share/helm/plugins
 # --verify=false required: helm-diff does not support plugin signature verification with Helm v4
 # https://github.com/databus23/helm-diff?tab=readme-ov-file#install
-RUN helm plugin install --verify=false --version v3.15.4 https://github.com/databus23/helm-diff
+RUN helm plugin install --verify=false --version v3.15.10 https://github.com/databus23/helm-diff
 COPY tools/ /usr/local/lib/actions-k8s-ci/
 COPY .kube-linter.yaml /usr/local/lib/actions-k8s-ci/.kube-linter.yaml
 RUN ln -s /usr/local/lib/actions-k8s-ci/argocd-render-application.sh /usr/local/bin/argocd-render-application \
