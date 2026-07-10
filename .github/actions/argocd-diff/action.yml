@@ -20,7 +20,7 @@ inputs:
   image:
     description: actions-k8s-ci image to use.
     required: false
-    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci@sha256:9e2f26db43c1a72d6c69ad2d4196669c3d7dd1c3b93e3d8111c0886f0944aec7'
+    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci@sha256:595f0af9554e7dc03f5854ed47b865d885eb08044fc2ed383838b073e0c410cc'
 
 # Alternative design: if the calling job sets `container: <image>`, composite
 # action run: steps execute inside that container and can call tools directly
