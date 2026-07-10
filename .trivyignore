@@ -1,0 +1,39 @@
+# CVEs in kube-linter v0.8.3's own transitive dependencies. kube-linter's
+# main branch has already bumped every one of these to a fixed version
+# (grpc v1.80.0, x/net v0.55.0, x/crypto v0.53.0, containerd v1.7.33,
+# oras-go v2.6.1), but v0.8.3 is still the latest tagged release - there's
+# no published version that ships those fixes yet, and pinning an unreleased
+# main pseudo-version was declined. kube-linter runs here as a local CLI
+# static-analysis tool over manifests checked out in CI, not as a
+# network-facing server, so the exploitability of these (mostly
+# server/network-facing) CVEs is low in this context. Drop these once
+# kube-linter cuts a release past v0.8.3. Entries expire below to force
+# that re-check.
+
+# google.golang.org/grpc v1.75.1 (fixed 1.79.3) - gRPC-Go server authz
+# bypass via malformed HTTP/2 :path; kube-linter isn't a gRPC server here.
+CVE-2026-33186 exp:2026-10-07
+
+# github.com/containerd/containerd v1.7.30 (fixed 1.7.32 / 1.7.33)
+CVE-2026-46680 exp:2026-10-07
+CVE-2026-53488 exp:2026-10-07
+
+# oras.land/oras-go/v2 v2.6.0 (fixed 2.6.1), pulled in via helm.sh/helm/v3
+CVE-2026-50151 exp:2026-10-07
+
+# golang.org/x/net v0.48.0 (fixed 0.53.0 / 0.55.0)
+CVE-2026-39821 exp:2026-10-07
+CVE-2026-33814 exp:2026-10-07
+CVE-2026-27136 exp:2026-10-07
+CVE-2026-25681 exp:2026-10-07
+
+# golang.org/x/crypto v0.46.0 (fixed 0.52.0)
+CVE-2026-46597 exp:2026-10-07
+CVE-2026-46595 exp:2026-10-07
+CVE-2026-42508 exp:2026-10-07
+CVE-2026-39835 exp:2026-10-07
+CVE-2026-39832 exp:2026-10-07
+CVE-2026-39831 exp:2026-10-07
+CVE-2026-39830 exp:2026-10-07
+CVE-2026-39829 exp:2026-10-07
+CVE-2026-39828 exp:2026-10-07

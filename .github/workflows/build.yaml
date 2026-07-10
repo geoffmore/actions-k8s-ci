@@ -48,8 +48,16 @@ jobs:
           # there's nothing actionable to do about them here. Only fail on
           # CVEs where upgrading actually resolves something.
           ignore-unfixed: true
+          # Fixes exist upstream for these but haven't reached a released
+          # version of the tool that ships them yet - see .trivyignore.
+          trivyignores: .trivyignore
           format: sarif
           output: trivy-results.sarif
+          # With format: sarif the action scans ALL severities for the report
+          # and ignores the `severity` filter when computing exit-code, so the
+          # gate would trip on Medium/Low noise. This makes both the SARIF and
+          # the exit-code honor `severity: CRITICAL,HIGH` above.
+          limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: ${{ !cancelled() }}
