@@ -7,6 +7,10 @@ checks:
     - "required-label-owner"
     - "dnsconfig-options"
     - "non-isolated-pod"
+    # Stylistic-only: enforces alphabetical YAML key ordering. Pulled in
+    # automatically by addAllBuiltIn when kube-linter added it as a built-in;
+    # we don't lint real manifests for key order.
+    - "sorted-keys"
 
 ignoredObjectConfigurations:
   # Suppress workload checks on CRD-backed resources that aren't actual workloads
