@@ -1,11 +1,14 @@
 # CVEs in kube-linter v0.8.3's own transitive dependencies. kube-linter's
-# maintainers haven't bumped these deps yet, and v0.8.3 is the latest
-# release as of this writing - there's no newer version to pick up fixes
-# from. kube-linter runs here as a local CLI static-analysis tool over
-# manifests checked out in CI, not as a network-facing server, so the
-# exploitability of these (mostly server/network-facing) CVEs is low in
-# this context. Re-check on kube-linter's next release and drop whichever
-# of these it resolves. Entries expire below to force that re-check.
+# main branch has already bumped every one of these to a fixed version
+# (grpc v1.80.0, x/net v0.55.0, x/crypto v0.53.0, containerd v1.7.33,
+# oras-go v2.6.1), but v0.8.3 is still the latest tagged release - there's
+# no published version that ships those fixes yet, and pinning an unreleased
+# main pseudo-version was declined. kube-linter runs here as a local CLI
+# static-analysis tool over manifests checked out in CI, not as a
+# network-facing server, so the exploitability of these (mostly
+# server/network-facing) CVEs is low in this context. Drop these once
+# kube-linter cuts a release past v0.8.3. Entries expire below to force
+# that re-check.
 
 # google.golang.org/grpc v1.75.1 (fixed 1.79.3) - gRPC-Go server authz
 # bypass via malformed HTTP/2 :path; kube-linter isn't a gRPC server here.
