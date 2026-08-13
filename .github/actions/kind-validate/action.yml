@@ -1,0 +1,218 @@
+name: Kind Validate
+description: >
+  Validates changed Kubernetes manifests against a real API server using a
+  disposable kind cluster. Optionally installs a folder of CRDs first so
+  custom resources validate against their actual schemas. For each changed
+  file, the nearest ancestor directory containing a kustomization.yaml is
+  rendered with `kustomize build`; files with no such ancestor are validated
+  as-is. Each resource's metadata.namespace is stripped before validation —
+  --dry-run=server requires the target namespace to actually exist, and this
+  cluster only has whatever namespaces the changed files themselves create,
+  so everything implicitly targets "default" instead. Validation uses
+  `kubectl apply --dry-run=server`, so nothing is persisted to the cluster.
+  Unlike the `*-diff` actions, kind and kubectl run
+  directly on the runner (via helm/kind-action) rather than through the
+  actions-k8s-ci image — kind needs the runner's own docker daemon to create
+  node containers, and dry-run validation needs a real API server to talk to.
+  The image is still used to render kustomize output.
+
+inputs:
+  paths:
+    description: Glob pattern scoping which changed files trigger validation (e.g. manifests/**)
+    required: true
+  k8s-version:
+    description: >
+      Kubernetes version to validate against, as a kindest/node image tag
+      (e.g. v1.31.2). Accepts tag@digest (e.g. v1.31.2@sha256:...) for
+      stricter pinning. Leave empty (default) to use whichever node image and
+      kubectl version the pinned kind-version below ships by default.
+    required: false
+    default: ''
+  kind-version:
+    description: >
+      kind release to install (passed straight through to helm/kind-action).
+      Kept in sync with that action's own default — bump both together when
+      the pinned SHA below is bumped.
+    required: false
+    default: 'v0.31.0'
+  crds:
+    description: >
+      Path to a directory of CustomResourceDefinition manifests (.yaml/.yml/.json)
+      to install into the cluster before validation. Applied non-recursively
+      via `kubectl apply -f`; the action waits for each CRD to become
+      Established before validating. Leave empty to skip.
+    required: false
+    default: ''
+  image:
+    description: actions-k8s-ci image to use for kustomize rendering.
+    required: false
+    default: 'public.ecr.aws/e3l5p3n5/geoffmore/actions-k8s-ci@sha256:595f0af9554e7dc03f5854ed47b865d885eb08044fc2ed383838b073e0c410cc'
+
+runs:
+  using: composite
+  steps:
+    - name: Get changed files
+      id: changed
+      uses: tj-actions/changed-files@22103cc46bda19c2b464ffe86db46df6922fd323 # v47.0.5
+      with:
+        files: ${{ inputs.paths }}
+
+    # helm/kind-action installs both kind and a matching kubectl itself, so
+    # (unlike cnpg-charts' setup-kind) there's no need for a separate
+    # azure/setup-kubectl step. Building node_image/kubectl_version here
+    # rather than inline in the `with:` block below because kind-action's
+    # kubectl_version can't take a tag@digest suffix (it's used to build a
+    # dl.k8s.io download URL) and can't be left empty (kind.sh errors on
+    # `--kubectl-version ""`), so the digest needs stripping and the "use
+    # kind-action's own default" fallback needs to be a real value, not "".
+    - name: Resolve k8s version inputs
+      id: resolve
+      if: steps.changed.outputs.any_changed == 'true'
+      shell: bash
+      env:
+        K8S_VERSION: ${{ inputs.k8s-version }}
+      run: |
+        if [ -n "$K8S_VERSION" ]; then
+          echo "node-image=kindest/node:${K8S_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "kubectl-version=${K8S_VERSION%%@*}" >> "$GITHUB_OUTPUT"
+        else
+          echo "node-image=" >> "$GITHUB_OUTPUT"
+          # Must match helm/kind-action's own default kubectl_version.
+          echo "kubectl-version=v1.35.0" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Create kind cluster
+      if: steps.changed.outputs.any_changed == 'true'
+      uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+      with:
+        version: ${{ inputs.kind-version }}
+        node_image: ${{ steps.resolve.outputs.node-image }}
+        kubectl_version: ${{ steps.resolve.outputs.kubectl-version }}
+        cluster_name: kind-validate-${{ github.run_id }}-${{ github.run_attempt }}
+        wait: 120s
+
+    - name: Install CRDs
+      if: steps.changed.outputs.any_changed == 'true' && inputs.crds != ''
+      shell: bash
+      env:
+        CRDS_DIR: ${{ inputs.crds }}
+      run: |
+        if [ -d "$CRDS_DIR" ] && [ -n "$(ls -A "$CRDS_DIR" 2>/dev/null)" ]; then
+          # --server-side: some CRDs (prometheus-operator, CNPG, etc.) have
+          # OpenAPI schemas large enough that client-side apply's embedded
+          # kubectl.kubernetes.io/last-applied-configuration annotation trips
+          # the 262144-byte metadata.annotations limit. Server-side apply
+          # tracks field ownership server-side instead, avoiding that limit.
+          if ! kubectl apply --server-side -f "$CRDS_DIR"; then
+            echo "::error::kubectl apply failed for CRDs under '$CRDS_DIR'" >&2
+            exit 1
+          fi
+          kubectl wait --for=condition=Established --all crd --timeout=60s
+        else
+          echo "No CRDs found under '$CRDS_DIR', skipping." >&2
+        fi
+
+    - name: Validate changed manifests
+      if: steps.changed.outputs.any_changed == 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+      run: |
+        find_kustomization() {
+          local dir="$1"
+          while true; do
+            if [ -f "$dir/kustomization.yaml" ] || [ -f "$dir/kustomization.yml" ]; then
+              echo "$dir"
+              return
+            fi
+            if [ "$dir" = "." ] || [ "$dir" = "/" ]; then
+              return
+            fi
+            dir="$(dirname "$dir")"
+          done
+        }
+
+        declare -A seen
+        failed=0
+        for file in $ALL_CHANGED_FILES; do
+          kdir="$(find_kustomization "$(dirname "$file")")"
+          key="${kdir:-$file}"
+          [ -n "${seen[$key]:-}" ] && continue
+          seen[$key]=1
+
+          if [ -n "$kdir" ]; then
+            label="$kdir"
+            # stderr is captured separately (not 2>&1) so a kustomize warning
+            # on an otherwise-successful build can't get mixed into $rendered
+            # and corrupt the YAML piped into `kubectl apply` below.
+            render_err_file="$(mktemp)"
+            rendered="$(docker run --rm --user "$(id -u):$(id -g)" \
+              -v "${{ github.workspace }}:${{ github.workspace }}" \
+              -w "${{ github.workspace }}" \
+              "$IMAGE" \
+              kustomize build "$kdir" 2>"$render_err_file")" && render_rc=0 || render_rc=$?
+            render_err="$(cat "$render_err_file")"
+            rm -f "$render_err_file"
+          else
+            label="$file"
+            rendered="$(cat "$file")"
+            render_rc=0
+            render_err=""
+          fi
+
+          {
+            echo "---"
+            echo "## Validation: \`$label\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$render_rc" -ne 0 ]; then
+            failed=1
+            {
+              echo ""
+              echo "> [!WARNING]"
+              echo "> **kustomize build failed**"
+              echo "$render_err" | while IFS= read -r line; do echo "> $line"; done
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+            continue
+          fi
+
+          # Strip metadata.namespace before validating: --dry-run=server still
+          # requires the target namespace to exist on the API server even
+          # though nothing is persisted, and this cluster only has whatever
+          # namespaces the changed files themselves happen to create. Dropping
+          # the namespace makes every namespaced resource implicitly target
+          # "default" (which always exists), trading exact-namespace fidelity
+          # for not having to pre-create every namespace a manifest assumes
+          # already exists elsewhere. Cluster-scoped resources are unaffected.
+          stripped="$(docker run --rm -i --user "$(id -u):$(id -g)" \
+            "$IMAGE" \
+            yq eval 'del(.metadata.namespace)' - <<<"$rendered")"
+
+          echo "::group::Validating $label"
+          # --server-side for the same reason as the CRD install above — a
+          # changed file can itself carry a large CRD (e.g. a vendored
+          # operator bundle) that would otherwise trip the client-side
+          # last-applied-configuration annotation's 262144-byte limit.
+          result="$(kubectl apply --server-side --dry-run=server --validate=strict -f - <<<"$stripped" 2>&1)" && rc=0 || rc=$?
+          echo "$result"
+          echo "::endgroup::"
+
+          if [ "$rc" -ne 0 ]; then
+            failed=1
+            {
+              echo ""
+              echo "> [!WARNING]"
+              echo "> **Validation failed**"
+              echo "$result" | while IFS= read -r line; do echo "> $line"; done
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ Valid" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done
+
+        exit $failed

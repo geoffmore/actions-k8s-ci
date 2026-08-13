@@ -6,11 +6,14 @@
 #               testdata/helm/test.sh               — helm-render-chart against local fixtures
 #
 # Action layer: NOT tested here.
-#   Composite actions (.github/actions/argocd-diff, helm-diff) depend on GHA
-#   infrastructure (tj-actions/changed-files, git history for base ref) that
+#   Composite actions (.github/actions/argocd-diff, helm-diff, kind-validate) depend
+#   on GHA infrastructure (tj-actions/changed-files, git history for base ref) that
 #   cannot be meaningfully exercised outside a real pull request context.
 #   - argocd-diff, helm-diff: best tested end-to-end in a consumer repo (e.g. kubernetes),
 #     since they require actual git history between base and PR branches
+#   - kind-validate: also needs a real docker daemon and a live API server to
+#     validate against, which this image-only test suite has no way to provide
+#     (it runs kind/kubectl on the bare runner, not inside the image under test)
 #   Local alternative: use `act` (https://github.com/nektos/act) to run
 #   workflows locally, though some GHA behaviours differ.
 
