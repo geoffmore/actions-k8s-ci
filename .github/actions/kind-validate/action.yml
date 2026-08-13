@@ -94,7 +94,10 @@ runs:
         CRDS_DIR: ${{ inputs.crds }}
       run: |
         if [ -d "$CRDS_DIR" ] && [ -n "$(ls -A "$CRDS_DIR" 2>/dev/null)" ]; then
-          kubectl apply -f "$CRDS_DIR"
+          if ! kubectl apply -f "$CRDS_DIR"; then
+            echo "::error::kubectl apply failed for CRDs under '$CRDS_DIR'" >&2
+            exit 1
+          fi
           kubectl wait --for=condition=Established --all crd --timeout=60s
         else
           echo "No CRDs found under '$CRDS_DIR', skipping." >&2
@@ -109,9 +112,12 @@ runs:
       run: |
         find_kustomization() {
           local dir="$1"
-          while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+          while true; do
             if [ -f "$dir/kustomization.yaml" ] || [ -f "$dir/kustomization.yml" ]; then
               echo "$dir"
+              return
+            fi
+            if [ "$dir" = "." ] || [ "$dir" = "/" ]; then
               return
             fi
             dir="$(dirname "$dir")"
@@ -128,15 +134,22 @@ runs:
 
           if [ -n "$kdir" ]; then
             label="$kdir"
+            # stderr is captured separately (not 2>&1) so a kustomize warning
+            # on an otherwise-successful build can't get mixed into $rendered
+            # and corrupt the YAML piped into `kubectl apply` below.
+            render_err_file="$(mktemp)"
             rendered="$(docker run --rm --user "$(id -u):$(id -g)" \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
               -w "${{ github.workspace }}" \
               "$IMAGE" \
-              kustomize build "$kdir" 2>&1)" && render_rc=0 || render_rc=$?
+              kustomize build "$kdir" 2>"$render_err_file")" && render_rc=0 || render_rc=$?
+            render_err="$(cat "$render_err_file")"
+            rm -f "$render_err_file"
           else
             label="$file"
             rendered="$(cat "$file")"
             render_rc=0
+            render_err=""
           fi
 
           {
@@ -150,7 +163,7 @@ runs:
               echo ""
               echo "> [!WARNING]"
               echo "> **kustomize build failed**"
-              echo "$rendered" | while IFS= read -r line; do echo "> $line"; done
+              echo "$render_err" | while IFS= read -r line; do echo "> $line"; done
               echo ""
             } >> "$GITHUB_STEP_SUMMARY"
             continue
