@@ -98,7 +98,12 @@ runs:
         CRDS_DIR: ${{ inputs.crds }}
       run: |
         if [ -d "$CRDS_DIR" ] && [ -n "$(ls -A "$CRDS_DIR" 2>/dev/null)" ]; then
-          if ! kubectl apply -f "$CRDS_DIR"; then
+          # --server-side: some CRDs (prometheus-operator, CNPG, etc.) have
+          # OpenAPI schemas large enough that client-side apply's embedded
+          # kubectl.kubernetes.io/last-applied-configuration annotation trips
+          # the 262144-byte metadata.annotations limit. Server-side apply
+          # tracks field ownership server-side instead, avoiding that limit.
+          if ! kubectl apply --server-side -f "$CRDS_DIR"; then
             echo "::error::kubectl apply failed for CRDs under '$CRDS_DIR'" >&2
             exit 1
           fi
@@ -186,7 +191,11 @@ runs:
             yq eval 'del(.metadata.namespace)' - <<<"$rendered")"
 
           echo "::group::Validating $label"
-          result="$(kubectl apply --dry-run=server --validate=strict -f - <<<"$stripped" 2>&1)" && rc=0 || rc=$?
+          # --server-side for the same reason as the CRD install above — a
+          # changed file can itself carry a large CRD (e.g. a vendored
+          # operator bundle) that would otherwise trip the client-side
+          # last-applied-configuration annotation's 262144-byte limit.
+          result="$(kubectl apply --server-side --dry-run=server --validate=strict -f - <<<"$stripped" 2>&1)" && rc=0 || rc=$?
           echo "$result"
           echo "::endgroup::"
 
