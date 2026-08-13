@@ -69,6 +69,8 @@ Validates changed Kubernetes manifests against a real API server using a disposa
 
 For each changed file, the nearest ancestor directory containing a `kustomization.yaml` is rendered with `kustomize build`; everything else is validated as-is. Unlike the `*-diff` actions, `kind` and `kubectl` run directly on the runner (via [helm/kind-action](https://github.com/helm/kind-action)) rather than through the actions-k8s-ci image — kind needs the runner's own docker daemon to create node containers.
 
+Each resource's `metadata.namespace` is stripped before validation — `--dry-run=server` requires the target namespace to actually exist, and this cluster only has whatever namespaces the changed files themselves create, so everything implicitly validates against `default` instead. This trades exact-namespace fidelity for not having to pre-create every namespace a manifest assumes already exists elsewhere.
+
 ```yaml
 - uses: geoffmore/actions-k8s-ci/.github/actions/kind-validate@main
   with:

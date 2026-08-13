@@ -5,8 +5,12 @@ description: >
   custom resources validate against their actual schemas. For each changed
   file, the nearest ancestor directory containing a kustomization.yaml is
   rendered with `kustomize build`; files with no such ancestor are validated
-  as-is. Validation uses `kubectl apply --dry-run=server`, so nothing is
-  persisted to the cluster. Unlike the `*-diff` actions, kind and kubectl run
+  as-is. Each resource's metadata.namespace is stripped before validation —
+  --dry-run=server requires the target namespace to actually exist, and this
+  cluster only has whatever namespaces the changed files themselves create,
+  so everything implicitly targets "default" instead. Validation uses
+  `kubectl apply --dry-run=server`, so nothing is persisted to the cluster.
+  Unlike the `*-diff` actions, kind and kubectl run
   directly on the runner (via helm/kind-action) rather than through the
   actions-k8s-ci image — kind needs the runner's own docker daemon to create
   node containers, and dry-run validation needs a real API server to talk to.
@@ -169,8 +173,20 @@ runs:
             continue
           fi
 
+          # Strip metadata.namespace before validating: --dry-run=server still
+          # requires the target namespace to exist on the API server even
+          # though nothing is persisted, and this cluster only has whatever
+          # namespaces the changed files themselves happen to create. Dropping
+          # the namespace makes every namespaced resource implicitly target
+          # "default" (which always exists), trading exact-namespace fidelity
+          # for not having to pre-create every namespace a manifest assumes
+          # already exists elsewhere. Cluster-scoped resources are unaffected.
+          stripped="$(docker run --rm -i --user "$(id -u):$(id -g)" \
+            "$IMAGE" \
+            yq eval 'del(.metadata.namespace)' - <<<"$rendered")"
+
           echo "::group::Validating $label"
-          result="$(kubectl apply --dry-run=server --validate=strict -f - <<<"$rendered" 2>&1)" && rc=0 || rc=$?
+          result="$(kubectl apply --dry-run=server --validate=strict -f - <<<"$stripped" 2>&1)" && rc=0 || rc=$?
           echo "$result"
           echo "::endgroup::"
 
