@@ -51,7 +51,12 @@ For each changed chart, the summary contains one diff section per render scenari
 
 ### `argocd-diff`
 
-Diffs rendered ArgoCD Application manifests between the base and PR branches. Walks up the directory tree from each changed file to find the nearest `application.yaml`.
+Diffs rendered ArgoCD Application manifests between the base and PR branches. Walks up the directory tree from each changed or deleted file to find the nearest `application.yaml`.
+
+- A file the PR deletes is looked up in the base branch. If its Application still exists in the PR, the Application is diffed as usual.
+- If the PR deletes the Application itself, the summary shows every resource it rendered on the base branch as removed.
+- A changed or deleted file that no Application owns is not diffed. The summary lists these files.
+- Applications that an ApplicationSet generates from a directory have no `application.yaml` above their files, so their files are listed as not owned. Rendering them is not supported yet.
 
 ```yaml
 - uses: geoffmore/actions-k8s-ci/.github/actions/argocd-diff@main
