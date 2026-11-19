@@ -1,9 +1,11 @@
 name: ArgoCD Diff
 description: >
   Diffs rendered ArgoCD Application manifests between the base and PR branches.
-  Walks up the directory tree from each changed file to find the nearest
-  application.yaml, renders both sides, and posts a resource-level diff to
-  the job summary. Optionally lints each PR render with kube-linter.
+  Walks up the directory tree from each changed or deleted file to find the
+  nearest application.yaml, renders both sides, and posts a resource-level diff
+  to the job summary. An Application that the PR deletes is shown as removed.
+  Files that no Application owns are listed in the summary. Optionally lints
+  each PR render with kube-linter.
 
 inputs:
   paths:
@@ -37,91 +39,119 @@ runs:
         files: ${{ inputs.paths }}
 
     - name: Diff affected ArgoCD Applications
-      if: steps.changed.outputs.any_changed == 'true'
+      if: steps.changed.outputs.any_changed == 'true' || steps.changed.outputs.any_deleted == 'true'
       shell: bash
       env:
         IMAGE: ${{ inputs.image }}
         BASE_REF: ${{ github.base_ref }}
         ALL_CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+        DELETED_FILES: ${{ steps.changed.outputs.deleted_files }}
         LINT: ${{ inputs.lint }}
         KUBE_LINTER_CONFIG: ${{ inputs.kube-linter-config }}
       run: |
-        find_application() {
-          local dir="$1"
-          while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
-            if [ -f "$dir/application.yaml" ]; then
-              echo "$dir/application.yaml"
-              return
-            fi
-            dir="$(dirname "$dir")"
-          done
-        }
-
         git fetch origin --depth 1 "$BASE_REF"
         git worktree add /tmp/base "origin/$BASE_REF"
 
-        declare -A seen
+        # Map each changed or deleted file to the Application that owns it.
+        # Prints "changed|deleted<TAB>application.yaml path" or "unmapped<TAB>file".
+        affected="$(BASE_DIR=/tmp/base HEAD_DIR=. \
+          CHANGED_FILES="$ALL_CHANGED_FILES" DELETED_FILES="$DELETED_FILES" \
+          bash "$GITHUB_ACTION_PATH/scripts/list-applications.sh")"
+        echo "::group::Affected Applications"
+        echo "$affected"
+        echo "::endgroup::"
+
         failed=0
-        for file in $ALL_CHANGED_FILES; do
-          app="$(find_application "$(dirname "$file")")"
-          if [ -n "$app" ] && [ -z "${seen[$app]:-}" ]; then
-            seen[$app]=1
+        unmapped=()
+        mapfile -t lines <<< "$affected"
+        for entry in "${lines[@]}"; do
+          [ -n "$entry" ] || continue
+          IFS=$'\t' read -r kind app <<< "$entry"
 
-            {
-              echo "---"
-              echo "## Manifest Diff: \`$app\`"
-            } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$kind" = "unmapped" ]; then
+            unmapped+=("$app")
+            continue
+          fi
 
-            base_tmp="$(mktemp)"
-            pr_tmp="$(mktemp)"
+          suffix=""
+          if [ "$kind" = "deleted" ]; then
+            suffix=" (Application deleted)"
+          fi
+          {
+            echo "---"
+            echo "## Manifest Diff: \`$app\`$suffix"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-            # Mount workspace at the same absolute path so git can resolve the
-            # worktree's .git reference back to the main repo's object store.
-            docker run --rm --user "$(id -u):$(id -g)" \
-              -v "${{ github.workspace }}:${{ github.workspace }}" \
-              -v /tmp/base:/tmp/base \
-              -w /tmp/base \
-              "$IMAGE" \
-              argocd-render-application "$app" > "$base_tmp" 2>/dev/null || true
+          base_tmp="$(mktemp)"
+          pr_tmp="$(mktemp)"
 
+          # Mount workspace at the same absolute path so git can resolve the
+          # worktree's .git reference back to the main repo's object store.
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "${{ github.workspace }}:${{ github.workspace }}" \
+            -v /tmp/base:/tmp/base \
+            -w /tmp/base \
+            "$IMAGE" \
+            argocd-render-application "$app" > "$base_tmp" 2>/dev/null || true
+
+          # A deleted Application has nothing to render in the PR. The empty
+          # PR file makes every base resource show as removed.
+          if [ "$kind" = "changed" ]; then
             docker run --rm --user "$(id -u):$(id -g)" \
               -v "${{ github.workspace }}:${{ github.workspace }}" \
               -w "${{ github.workspace }}" \
               "$IMAGE" \
               argocd-render-application "$app" > "$pr_tmp"
+          fi
 
-            if [ "$LINT" = "true" ]; then
-              lint_args=(kube-linter lint)
-              [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
-              echo "::group::Linting $app"
-              lint_output="$(docker run --rm --user "$(id -u):$(id -g)" \
-                -v "$pr_tmp:/pr.yaml:ro" \
-                "$IMAGE" \
-                "${lint_args[@]}" /pr.yaml 2>&1)" && lint_rc=0 || lint_rc=$?
-              echo "$lint_output"
-              echo "::endgroup::"
-              if [ "$lint_rc" -ne 0 ]; then
-                failed=1
-                {
-                  echo ""
-                  echo "> [!WARNING]"
-                  echo "> **Lint issues**"
-                  echo "$lint_output" | while IFS= read -r line; do echo "> $line"; done
-                  echo ""
-                } >> "$GITHUB_STEP_SUMMARY"
-              fi
-            fi
-
-            docker run --rm --user "$(id -u):$(id -g)" \
-              -v "$base_tmp:/base.yaml:ro" \
+          if [ "$LINT" = "true" ] && [ "$kind" = "changed" ]; then
+            lint_args=(kube-linter lint)
+            [ -n "$KUBE_LINTER_CONFIG" ] && lint_args+=(--config "$KUBE_LINTER_CONFIG")
+            echo "::group::Linting $app"
+            lint_output="$(docker run --rm --user "$(id -u):$(id -g)" \
               -v "$pr_tmp:/pr.yaml:ro" \
               "$IMAGE" \
-              diff-manifests /base.yaml /pr.yaml | tee -a "$GITHUB_STEP_SUMMARY"
-
-            rm -f "$base_tmp" "$pr_tmp"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
+              "${lint_args[@]}" /pr.yaml 2>&1)" && lint_rc=0 || lint_rc=$?
+            echo "$lint_output"
+            echo "::endgroup::"
+            if [ "$lint_rc" -ne 0 ]; then
+              failed=1
+              {
+                echo ""
+                echo "> [!WARNING]"
+                echo "> **Lint issues**"
+                echo "$lint_output" | while IFS= read -r line; do echo "> $line"; done
+                echo ""
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
+
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$base_tmp:/base.yaml:ro" \
+            -v "$pr_tmp:/pr.yaml:ro" \
+            "$IMAGE" \
+            diff-manifests /base.yaml /pr.yaml | tee -a "$GITHUB_STEP_SUMMARY"
+
+          rm -f "$base_tmp" "$pr_tmp"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
         done
+
+        # Files no Application owns are not diffed. List them so that is visible.
+        if [ "${#unmapped[@]}" -gt 0 ]; then
+          echo "::notice::${#unmapped[@]} changed file(s) are not owned by an Application and were not diffed"
+          {
+            echo "---"
+            echo "<details>"
+            echo "<summary>${#unmapped[@]} changed file(s) not owned by an Application (not diffed)</summary>"
+            echo ""
+            for file in "${unmapped[@]}"; do
+              echo "- \`$file\`"
+            done
+            echo ""
+            echo "</details>"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
 
         git worktree remove /tmp/base
         exit $failed
